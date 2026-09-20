@@ -3,7 +3,7 @@
 ## Candidate
 
 - **Name:** Maheshwari
-- **Email:** your-email@example.com
+- **Email:** maheshwari3044@gmail.com
 - **GitHub:** https://github.com/Maheshwari3/SafeTrack---Caygnus-Product-Engineering-Challenge
 - **Selected problem:** Problem 2 — Offline-Capable Mobile Conversation
 - **Demo video:** Add your final demo video link
