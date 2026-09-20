@@ -1,0 +1,49 @@
+import SQLite from 'react-native-sqlite-storage';
+
+// Enable Promise support for SQLite
+SQLite.enablePromise(true);
+
+const DATABASE_NAME = 'SafeTrack.db';
+const DATABASE_VERSION = '1.0';
+const DATABASE_DISPLAYNAME = 'SafeTrack Offline Database';
+const DATABASE_SIZE = 200000;
+
+export const getDBConnection = async () => {
+  return SQLite.openDatabase(
+    DATABASE_NAME,
+    DATABASE_VERSION,
+    DATABASE_DISPLAYNAME,
+    DATABASE_SIZE
+  );
+};
+
+export const createTables = async (db) => {
+  // Create Incidents table with new schema
+  const query = `
+    CREATE TABLE IF NOT EXISTS incidents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clientIncidentId TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      location TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      description TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      syncStatus TEXT NOT NULL,
+      retryCount INTEGER DEFAULT 0,
+      lastError TEXT
+    );
+  `;
+  await db.executeSql(query);
+};
+
+export const initializeDB = async () => {
+  try {
+    const db = await getDBConnection();
+    await createTables(db);
+    console.log('Database initialized successfully');
+    return db;
+  } catch (error) {
+    console.error('Database initialization error:', error);
+    throw error;
+  }
+};
