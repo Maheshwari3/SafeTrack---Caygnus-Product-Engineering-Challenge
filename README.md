@@ -60,44 +60,95 @@ npm test
 
 ### AC1 — Offline send
 
-```text
-Describe how to send a message while offline and verify the pending state.
+```
+Disable network connectivity.
+Open the Factory Safety conversation.
+Send a safety message.
+Verify that the message appears immediately in the conversation.
+Verify that the message is stored in the local SQLite outbox.
+Verify that its delivery state is shown as pending.
+
+The message is not lost when there is no network connection because SQLite provides durable local storage.
 ```
 
 ### AC2 — Force-close durability
 
-```text
-Describe how to create a message offline, force-close the app,
-reopen it, and verify that the message remains available.
+```
+Disable network connectivity.
+Send a message.
+Verify that the message is pending.
+Force-close the application.
+Reopen the application.
+Open the Factory Safety conversation.
+Verify that the previously created message is still available.
+
+The message remains available because it was persisted in SQLite rather than only being held in React component state.
 ```
 
 ### AC3 — Reconnection sync
 
-```text
-Describe how to restore connectivity and verify pending messages
-are synchronized and marked as delivered.
+```
+Create one or more messages while offline.
+Verify that the messages are pending.
+Restore network connectivity.
+NetInfo detects the connectivity change.
+The Sync Manager retrieves pending messages from the local outbox.
+Messages are sent to the backend.
+Successfully synchronized messages are marked as delivered.
+Verify the corresponding messages in the backend.
+
+Queued messages are processed sequentially according to their local creation order.
 ```
 
 ### AC4 — Temporary failure and retry
 
-```text
-Describe how to simulate a temporary failure, verify the failed state,
-automatic retry behaviour, and manual retry.
+```
+Temporary failure and retry
+Create a message while offline.
+Restore connectivity while the backend is unavailable or simulate a synchronization failure.
+Attempt synchronization.
+Verify that the message enters the failed state.
+Verify that the error information and retry count are retained.
+Restore the backend/connectivity condition.
+Manually retry the failed message.
+Verify that synchronization succeeds.
+Verify that the message becomes delivered.
+
+The retry behavior is bounded according to the application's configured retry policy.
 ```
 
 ### AC5 — Uncertain acknowledgement and idempotency
 
-```text
-Describe how repeated requests using the same clientMessageId
-are prevented from creating duplicate server-side messages.
+```
+Temporary failure and retry
+Create a message while offline.
+Restore connectivity while the backend is unavailable or simulate a synchronization failure.
+Attempt synchronization.
+Verify that the message enters the failed state.
+Verify that the error information and retry count are retained.
+Restore the backend/connectivity condition.
+Manually retry the failed message.
+Verify that synchronization succeeds.
+Verify that the message becomes delivered.
+
+The retry behavior is bounded according to the application's configured retry policy.
 ```
 
 ### Verification benchmark
 
-```text
-Add the exact steps/commands used for the benchmark.
+```
+The intended benchmark is:
 
-Include the observed result, counts, final states, and any mismatches.
+Disable network connectivity.
+Queue at least 10 messages.
+Verify that all messages are stored locally.
+Restart the application.
+Verify that all queued messages remain available.
+Restore connectivity.
+Allow synchronization to complete.
+Verify the resulting backend records.
+Repeat a request using an existing clientMessageId.
+Verify that no duplicate server-side message is created.
 ```
 
 Describe the failure or recovery scenario demonstrated in the video and how a reviewer can reproduce it.
