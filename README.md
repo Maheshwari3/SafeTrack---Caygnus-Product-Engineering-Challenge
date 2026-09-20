@@ -30,14 +30,18 @@ npm run dev
 
 ### Mobile
 
+```
 npm install
 npm start
 npx react-native run-android
+```
 
 ### Environment Variables
 
+```
 MONGODB_URI=<your-mongodb-connection-string>
 PORT=5000
+```
 
 Explain how the reviewer can trigger the successful scenario and the required failure or recovery scenario.
 
@@ -45,8 +49,10 @@ Explain how the reviewer can trigger the successful scenario and the required fa
 
 ## Run the tests
 
+```
 cd backend
 npm test
+```
 
 ---
 
