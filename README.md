@@ -2,11 +2,11 @@
 
 ## Candidate
 
-* **Name:**
-* **Email:**
-* **GitHub:**
-* **Selected problem:**
-* **Demo video:**
+- **Name:** Maheshwari
+- **Email:** your-email@example.com
+- **GitHub:** https://github.com/Maheshwari3/SafeTrack---Caygnus-Product-Engineering-Challenge
+- **Selected problem:** Problem 2 — Offline-Capable Mobile Conversation
+- **Demo video:** Add your video link
 
 ---
 
@@ -22,23 +22,20 @@
 
 ### Backend
 
-```text
-Add backend setup and run commands here.
-```
+cd backend
+npm install
+npm run dev
 
 ### Mobile
 
-```text
-Add mobile setup and run commands here.
-```
+npm install
+npm start
+npx react-native run-android
 
 ### Environment Variables
 
-```text
-Add required environment-variable names here.
-
-Do not commit secret values.
-```
+MONGODB_URI=<your-mongodb-connection-string>
+PORT=5000
 
 Explain how the reviewer can trigger the successful scenario and the required failure or recovery scenario.
 
@@ -46,9 +43,8 @@ Explain how the reviewer can trigger the successful scenario and the required fa
 
 ## Run the tests
 
-```text
-Add test commands here.
-```
+cd backend
+npm test
 
 ---
 
