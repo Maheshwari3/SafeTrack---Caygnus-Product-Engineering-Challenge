@@ -106,8 +106,20 @@ Describe the failure or recovery scenario demonstrated in the video and how a re
 
 ## Architecture and data flow
 
-```text
-Add architecture diagram or explanation here.
+```
+React Native
+    ↓
+Conversation Screen
+    ↓
+Message Repository
+    ↓
+SQLite Local Outbox
+    ↓
+SyncManager
+    ↓
+Node.js / Express API
+    ↓
+MongoDB
 ```
 
 Describe the main components, their responsibilities, and how data moves between them.
