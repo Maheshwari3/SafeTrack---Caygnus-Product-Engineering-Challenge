@@ -1,97 +1,186 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Product Engineering Challenge Submission
 
-# Getting Started
+## Candidate
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+* **Name:**
+* **Email:**
+* **GitHub:**
+* **Selected problem:**
+* **Demo video:**
 
-## Step 1: Start Metro
+---
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Run the project
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+### Prerequisites
 
-```sh
-# Using npm
-npm start
+* Node.js 18+
+* React Native development environment
+* Android Studio / Android SDK
+* Android emulator or physical Android device
+* MongoDB
 
-# OR using Yarn
-yarn start
+### Backend
+
+```text
+Add backend setup and run commands here.
 ```
 
-## Step 2: Build and run your app
+### Mobile
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+```text
+Add mobile setup and run commands here.
 ```
 
-### iOS
+### Environment Variables
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+```text
+Add required environment-variable names here.
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+Do not commit secret values.
 ```
 
-Then, and every time you update your native dependencies, run:
+Explain how the reviewer can trigger the successful scenario and the required failure or recovery scenario.
 
-```sh
-bundle exec pod install
+---
+
+## Run the tests
+
+```text
+Add test commands here.
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+---
 
-```sh
-# Using npm
-npm run ios
+## Acceptance scenarios and verification
 
-# OR using Yarn
-yarn ios
+### AC1 — Offline send
+
+```text
+Describe how to send a message while offline and verify the pending state.
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+### AC2 — Force-close durability
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+```text
+Describe how to create a message offline, force-close the app,
+reopen it, and verify that the message remains available.
+```
 
-## Step 3: Modify your app
+### AC3 — Reconnection sync
 
-Now that you have successfully run the app, let's make changes!
+```text
+Describe how to restore connectivity and verify pending messages
+are synchronized and marked as delivered.
+```
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+### AC4 — Temporary failure and retry
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+```text
+Describe how to simulate a temporary failure, verify the failed state,
+automatic retry behaviour, and manual retry.
+```
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+### AC5 — Uncertain acknowledgement and idempotency
 
-## Congratulations! :tada:
+```text
+Describe how repeated requests using the same clientMessageId
+are prevented from creating duplicate server-side messages.
+```
 
-You've successfully run and modified your React Native App. :partying_face:
+### Verification benchmark
 
-### Now what?
+```text
+Add the exact steps/commands used for the benchmark.
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+Include the observed result, counts, final states, and any mismatches.
+```
 
-# Troubleshooting
+Describe the failure or recovery scenario demonstrated in the video and how a reviewer can reproduce it.
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+---
 
-# Learn More
+## Architecture and data flow
 
-To learn more about React Native, take a look at the following resources:
+```text
+Add architecture diagram or explanation here.
+```
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Describe the main components, their responsibilities, and how data moves between them.
+
+---
+
+## Technology choices
+
+```text
+Explain the selected technologies, alternatives considered,
+and the trade-offs accepted.
+```
+
+---
+
+## Important decisions
+
+### 1. Durable local outbox
+
+```text
+Describe the decision and reasoning.
+```
+
+### 2. Stable client-generated identifiers
+
+```text
+Describe the decision and reasoning.
+```
+
+### 3. Synchronization and ordering
+
+```text
+Describe the decision, ordering policy, and trade-offs.
+```
+
+---
+
+## Assumptions and limitations
+
+```text
+List assumptions, known limitations, and deliberately unfinished work.
+```
+
+---
+
+## Production and scale
+
+```text
+Describe what would be changed for production or significantly
+greater scale, and why.
+
+Clearly distinguish the submitted implementation from proposed improvements.
+```
+
+---
+
+## AI usage
+
+```text
+List any AI tools used, how they contributed,
+and how their output was reviewed or tested.
+
+If no AI tools were used, state that clearly.
+```
+
+---
+
+## Credibility note
+
+```text
+Describe one product or system previously helped ship:
+
+- The problem it solved
+- Personal contribution
+- Scale or operational complexity
+- One difficult engineering or product decision
+- Public link or other evidence, when available
+
+Confidential details may be anonymized and figures may be approximate.
+```
