@@ -7,10 +7,14 @@ import CreateIncidentScreen from './src/screens/CreateIncidentScreen';
 import IncidentDetailsScreen from './src/screens/IncidentDetailsScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import { initializeDB } from './src/database/database';
-import SyncManager from './src/sync/SyncManager'; 
+import SyncManager from './src/sync/SyncManager';
+import ConversationScreen from './src/screens/ConversationScreen';
 
 function App() {
-  const [currentRoute, setCurrentRoute] = useState({ name: 'Dashboard', params: {} });
+  const [currentRoute, setCurrentRoute] = useState({
+    name: 'Dashboard',
+    params: {},
+  });
   const [isDBReady, setIsDBReady] = useState(false);
 
   useEffect(() => {
@@ -46,6 +50,8 @@ function App() {
         return <IncidentDetailsScreen route={{ params: currentRoute.params }} navigation={navigation} />;
       case 'History':
         return <HistoryScreen navigation={navigation} />;
+      case 'Conversation':
+        return <ConversationScreen navigation={navigation} />;
       case 'Dashboard':
       default:
         return <DashboardScreen navigation={navigation} />;
@@ -56,8 +62,8 @@ function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
       {isDBReady ? renderScreen() : (
-        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-          <Text style={{color: COLORS.text}}>Loading...</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: COLORS.text }}>Loading...</Text>
         </View>
       )}
     </SafeAreaView>

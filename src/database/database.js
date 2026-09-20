@@ -18,8 +18,8 @@ export const getDBConnection = async () => {
 };
 
 export const createTables = async (db) => {
-  // Create Incidents table with new schema
-  const query = `
+  // Existing incidents table
+  const incidentsQuery = `
     CREATE TABLE IF NOT EXISTS incidents (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       clientIncidentId TEXT UNIQUE NOT NULL,
@@ -33,7 +33,24 @@ export const createTables = async (db) => {
       lastError TEXT
     );
   `;
-  await db.executeSql(query);
+
+  await db.executeSql(incidentsQuery);
+
+  // Problem 2 message outbox
+  const messagesQuery = `
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clientMessageId TEXT UNIQUE NOT NULL,
+      conversationId TEXT NOT NULL,
+      content TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      deliveryState TEXT NOT NULL,
+      retryCount INTEGER DEFAULT 0,
+      lastError TEXT
+    );
+  `;
+
+  await db.executeSql(messagesQuery);
 };
 
 export const initializeDB = async () => {
