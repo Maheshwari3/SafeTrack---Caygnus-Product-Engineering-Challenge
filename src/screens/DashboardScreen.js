@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, TYPOGRAPHY, ROUNDING } from '../theme';
 import { getIncidentsLocal, getQueueSummaryLocal } from '../database/incidentRepository';
 import SyncManager from '../sync/SyncManager';
-import { History } from 'lucide-react-native';
+import { History, MessageCircleMore } from 'lucide-react-native';
 import { INCIDENTS_API_URL } from '../config';
 
 export default function DashboardScreen({ navigation }) {
@@ -103,7 +103,7 @@ export default function DashboardScreen({ navigation }) {
         </View>
       </View>
       <Text style={styles.locationText}>📍 {item.location}</Text>
-      
+
       <View style={styles.cardFooter}>
         <View>
           <Text style={styles.dateText}>{new Date(item.createdAt).toLocaleDateString()}</Text>
@@ -122,7 +122,7 @@ export default function DashboardScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-      
+
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Good morning,</Text>
@@ -133,13 +133,22 @@ export default function DashboardScreen({ navigation }) {
             <View style={[styles.statusDot, { backgroundColor: isOnline ? COLORS.synced : COLORS.failed }]} />
             <Text style={styles.networkText}>{isOnline ? 'Online' : 'Offline'}</Text>
           </View>
-          <TouchableOpacity 
-            style={{ flexDirection:'row', alignItems:'center', gap:5,marginTop: 8, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border }}
-            onPress={() => navigation.navigate('History')}
-          >
-            <History size={20} color={COLORS.text} />
-            <Text style={{ fontSize: 12, fontWeight: 'bold', color: COLORS.text }}>History</Text>
-          </TouchableOpacity>
+          <View style={{flexDirection:'row',gap:4}}>
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border }}
+              onPress={() => navigation.navigate('Conversation')}
+            >
+              <MessageCircleMore size={20} color={COLORS.text} />
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: COLORS.text }}>Chat</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border }}
+              onPress={() => navigation.navigate('History')}
+            >
+              <History size={20} color={COLORS.text} />
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: COLORS.text }}>History</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 

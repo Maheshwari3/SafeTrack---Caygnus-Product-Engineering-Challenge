@@ -4,3 +4,5 @@
 
 export const API_BASE_URL = 'http://10.187.218.9:5000';
 export const INCIDENTS_API_URL = `${API_BASE_URL}/api/incidents`;
+export const MESSAGES_API_URL =
+    `${API_BASE_URL}/api/messages`;
