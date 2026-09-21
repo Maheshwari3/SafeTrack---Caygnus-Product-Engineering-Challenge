@@ -520,15 +520,22 @@ Application behavior was manually tested during development.
 
 ### Previous project
 
-**Project:** `SafeTrack`
+**Project:** FoodApp Vendor
 
-* **Problem solved:** `Factory workers need to report safety incidents/messages even with unreliable shop-floor connectivity, without losing reports or creating duplicates`
-* **Personal contribution:** `<Describe what you personally designed, implemented, or owned>`
-* **Scale / operational complexity:** `<Add truthful information about users, transactions, APIs, deployment, or other relevant complexity>`
-* **Difficult engineering/product decision:** `<Describe one real decision, the alternatives considered, and why you chose the final approach>`
-* **Public link/evidence:** `https://github.com/Maheshwari3/SafeTrack---Caygnus-Product-Engineering-Challenge`
+- **Problem solved:**  
+  A mobile application for food vendors to manage customer orders and related vendor operations.
 
-Confidential project information can be anonymized and numerical figures can be approximate where appropriate.
+- **Personal contribution:**  
+  I worked on the React Native application, including UI development, API integration, order-related functionality, and debugging application issues.
+
+- **Scale / operational complexity:**  
+  The application involved communication between the mobile application and backend APIs for vendor and order-related operations. I worked with asynchronous API responses and different application states such as loading, success, and error states.
+
+- **Difficult engineering/product decision:**  
+  One of the challenges was keeping the mobile application's UI state consistent with asynchronous backend API responses. I handled API communication and UI state updates separately so that loading, success, and error states could be managed more reliably.
+
+- **Public link/evidence:**  
+  The project is not publicly available on GitHub, so source code cannot be provided as public evidence.
 
 ---
 
