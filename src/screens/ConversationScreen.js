@@ -299,7 +299,7 @@ export default function ConversationScreen({ navigation }) {
                                     { color: isOnline ? '#2ECC71' : COLORS.textMuted },
                                 ]}
                             >
-                                {isOnline ? 'Online' : 'Offline (Local Durable)'}
+                                {isOnline ? 'Online' : 'Offline'}
                                 {simOffline ? ' [Simulated]' : ''}
                             </Text>
                         </View>
@@ -346,7 +346,7 @@ export default function ConversationScreen({ navigation }) {
                         </View>
 
                         {/* Simulation Switches */}
-                        <View style={styles.simSwitchRow}>
+                        {/* <View style={styles.simSwitchRow}>
                             <Text style={styles.switchLabel}>Simulate Offline:</Text>
                             <Switch
                                 value={simOffline}
@@ -371,7 +371,7 @@ export default function ConversationScreen({ navigation }) {
                                 onValueChange={handleToggleSimLostAck}
                                 trackColor={{ false: '#3A3A3C', true: '#9B59B6' }}
                             />
-                        </View>
+                        </View> */}
 
                         {/* Benchmark & Maintenance Buttons */}
                         <View style={styles.simActionRow}>
