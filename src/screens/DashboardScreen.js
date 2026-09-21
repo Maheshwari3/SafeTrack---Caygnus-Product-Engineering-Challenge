@@ -21,15 +21,20 @@ export default function DashboardScreen({ navigation }) {
 
       if (onlineState) {
         try {
-          const response = await fetch(INCIDENTS_API_URL);
-          if (response.ok) {
+          let response;
+          try {
+            response = await fetch(INCIDENTS_API_URL);
+          } catch {
+            response = await fetch('http://localhost:5000/api/incidents');
+          }
+          if (response && response.ok) {
             const apiData = await response.json();
             if (Array.isArray(apiData)) {
               summary.synced = Math.max(summary.synced, apiData.length);
             }
           }
         } catch (apiError) {
-          console.warn('Could not fetch server synced count:', apiError.message);
+          console.log('Could not fetch server synced count:', apiError.message);
         }
       }
 

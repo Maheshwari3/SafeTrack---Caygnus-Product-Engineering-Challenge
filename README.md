@@ -1,97 +1,745 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# SafeTrack — Offline-Capable Factory Safety Conversation
 
-# Getting Started
+SafeTrack is an **offline-first factory safety mobile application** built for the **Caygnus Product Engineering Challenge**.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+The application allows factory workers to send safety-related messages even when there is no internet connection. Messages are stored locally on the device and synchronized with the backend when connectivity is restored.
 
-## Step 1: Start Metro
+The project focuses on:
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+* Offline message creation
+* Durable local persistence (SQLite)
+* Automatic synchronization on network reconnection
+* Failed synchronization and retry (bounded retries & manual retry)
+* Application restart & crash durability
+* Deterministic message ordering (FIFO)
+* Idempotent message ingestion (stable UUIDs & zero duplicate records)
+* Server-side persistence (MongoDB)
+* Repeatable end-to-end verification benchmark
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+---
 
-```sh
-# Using npm
+## Selected Problem
+
+**Problem 2 — Offline-Capable Mobile Conversation**
+
+SafeTrack demonstrates how a mobile conversation system guarantees message delivery without loss when network connectivity is unavailable, interrupted, or uncertain.
+
+A message follows this lifecycle:
+
+```text
+User creates message
+        ↓
+Generate clientMessageId (UUID)
+        ↓
+Save to SQLite
+        ↓
+     PENDING
+        ↓
+Network available
+        ↓
+   SyncManager
+        ↓
+Node.js / Express
+        ↓
+     MongoDB
+        ↓
+    DELIVERED
+```
+
+If synchronization encounters a failure:
+
+```text
+SENDING
+   ↓
+ FAILED (Attempt X / 3)
+   ↓
+Auto-retry on reconnect (if < 3) / User taps 'Retry'
+   ↓
+SENDING
+   ↓
+DELIVERED
+```
+
+---
+
+# Key Features
+
+### 1. Offline messaging
+Users can create safety messages without an internet connection. Messages are saved to the device before transmission is attempted.
+
+### 2. Durable local storage
+SQLite is used as a local outbox (`messages` table) so messages survive application backgrounding, termination, battery death, and process restarts.
+
+### 3. Crash recovery supervisor
+If the application is terminated while a message is in-flight (`sending`), the system automatically resets its state back to `pending` upon startup via `resetSendingMessagesLocal()`, guaranteeing messages are never stranded.
+
+### 4. Automatic synchronization
+When network connectivity returns, `SyncManager` detects the transition via `@react-native-community/netinfo` and automatically drains pending messages.
+
+### 5. Reviewer simulation drawer
+An in-app diagnostic control panel allowing reviewers to simulate:
+- Offline mode without disabling device Wi-Fi
+- Temporary 503 backend failure
+- Lost network acknowledgements
+- Queueing 10 benchmark messages with one tap
+
+### 6. Strict FIFO message ordering
+Queued messages are processed sequentially according to local creation time (`ORDER BY createdAt ASC, id ASC`), preserving causal consistency.
+
+### 7. Bounded retries & manual recovery
+Temporary errors (5xx, timeouts) are retried automatically up to `MAX_AUTO_RETRIES = 3`. Once exhausted, messages transition to a terminal failed state requiring explicit user manual retry.
+
+### 8. Idempotency against uncertain acknowledgements
+Every message carries a stable client-generated UUID (`clientMessageId`). The backend enforces a unique index in MongoDB, catching duplicate key errors (code `11000`) and returning HTTP 200 with the existing record rather than creating duplicates.
+
+### 9. Dynamic queue draining (Stretch Goal)
+Messages added to the outbox while synchronization is actively running are dynamically picked up and synchronized in order without corrupting state.
+
+---
+
+# Architecture
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                      React Native App                       │
+│                   (Frontend/SafeTrack)                      │
+│                                                             │
+│    ConversationScreen.js                                    │
+│    - Renders optimistic chat list                           │
+│    - Delivery badges (Pending, Sending, Failed, Delivered)  │
+│    - Reviewer Simulation Controls & Manual Retry            │
+│             ↓                                               │
+│    messageRepository.js / database.js                       │
+│    - Durable SQLite database table 'messages'               │
+│    - Crash recovery: resetSendingMessagesLocal()            │
+│             ↓                                               │
+│    SyncManager.js                                           │
+│    - NetInfo network lifecycle listener                     │
+│    - Mutex concurrency guard (isSyncing)                    │
+│    - FIFO queue processor (createdAt ASC, id ASC)           │
+│    - Bounded retries (MAX_AUTO_RETRIES = 3)                 │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               │ HTTP REST API (clientMessageId)
+                               ↓
+┌─────────────────────────────────────────────────────────────┐
+│                      Node.js + Express                      │
+│                   (backend/ or Backend/)                    │
+│                                                             │
+│    messageController.js                                     │
+│    - Unique clientMessageId validation                      │
+│    - Idempotent duplicate resolution (HTTP 200)             │
+│    - Reviewer simulation flags (503 failure, lost ack)      │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ↓
+┌─────────────────────────────────────────────────────────────┐
+│                           MongoDB                           │
+│                                                             │
+│    Message Collection                                       │
+│    - Unique index: { clientMessageId: 1 }                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+# Main Components
+
+## 1. Conversation Screen (`src/screens/ConversationScreen.js`)
+* Displays the safety conversation feed.
+* Provides immediate optimistic UI display with delivery badges.
+* Houses the collapsible Reviewer Simulation Drawer.
+* Provides one-tap manual retry for failed messages.
+
+## 2. Message Repository (`src/database/messageRepository.js`)
+* Manages the SQLite durable outbox table `messages`.
+* Handles saving new messages locally before transmission.
+* Manages query retrieval for pending/failed messages.
+* Updates delivery state (`pending`, `sending`, `failed`, `delivered`).
+* Implements crash recovery to reset in-flight `sending` messages back to `pending`.
+
+## 3. SQLite Local Outbox (`src/database/database.js`)
+* Stores messages persistently across app force-closes and restarts.
+* Preserves message schema: `clientMessageId`, `conversationId`, `content`, `createdAt`, `deliveryState`, `retryCount`, `lastError`.
+
+## 4. SyncManager (`src/sync/SyncManager.js`)
+* Manages network connectivity events via `@react-native-community/netinfo`.
+* Enforces single-concurrency execution (`isSyncing` mutex).
+* Coordinates sequential FIFO transmission (`createdAt ASC, id ASC`).
+* Enforces bounded retries (`MAX_AUTO_RETRIES = 3`).
+* Dynamic while-loop draining for messages added during sync (**Stretch Goal**).
+
+## 5. Node.js / Express API (`backend/src/controllers/messageController.js`)
+* Ingests messages via `POST /api/messages`.
+* Enforces idempotency: detects MongoDB duplicate key code `11000` and returns HTTP 200 with the existing record.
+* Supports simulation headers: `x-simulate-failure` (HTTP 503) and `x-simulate-lost-ack` (saves to DB, drops client response).
+
+## 6. MongoDB Persistence (`backend/src/models/Message.js`)
+* Server-side source of truth.
+* Strict unique index constraint on `clientMessageId`.
+
+---
+
+# Message Lifecycle
+
+```text
+       [User writes message]
+                 │
+                 ▼
+            ┌─────────┐
+            │ PENDING │ ◄──┐ (On App Restart if was 'sending')
+            └────┬────┘    │ (On Manual Retry from 'failed')
+                 │         │
+          (Sync starts)    │
+                 ▼         │
+            ┌─────────┐    │
+            │ SENDING ├────┘
+            └────┬────┘
+                 │
+      ┌──────────┴──────────┐
+  (HTTP 200/201)       (Network Error / 5xx)
+      │                     │
+      ▼                     ▼
+┌───────────┐         ┌───────────┐
+│ DELIVERED │         │  FAILED   │ (retryCount++)
+└───────────┘         └─────┬─────┘
+                            │
+               ┌────────────┴────────────┐
+       (retryCount < MAX)         (retryCount >= MAX)
+               │                         │
+               ▼                         ▼
+         [Auto-Retry on           [Requires Manual
+          Reconnection]            Retry by User]
+```
+
+---
+
+# Technology Stack
+
+| Technology | Purpose |
+| :--- | :--- |
+| **React Native (0.80.0)** | Cross-platform mobile framework (Android target) |
+| **React 19** | Component UI state & concurrent rendering |
+| **SQLite (`react-native-sqlite-storage`)** | Durable local message outbox |
+| **NetInfo (`@react-native-community/netinfo`)** | Network connectivity monitoring & event dispatch |
+| **UUID (`uuid`)** | Stable client-generated message identifiers |
+| **Node.js + Express** | Lightweight backend REST API |
+| **MongoDB + Mongoose** | Server-side persistence with unique index idempotency |
+| **Jest + Supertest** | Automated unit & integration test suites |
+
+---
+
+# Why These Technologies?
+
+### React Native
+Used to build the mobile application and provide the Android implementation required for the challenge.
+
+### SQLite
+Used for durable local storage because offline messages must survive application termination, battery loss, and system restarts.
+
+### NetInfo
+Used to monitor network connectivity and trigger synchronization when connectivity returns.
+
+### UUID
+Used to generate stable client-side message identifiers (`clientMessageId`) before synchronization begins.
+
+### Node.js + Express
+Used to build a lightweight REST backend suitable for the challenge requirements.
+
+### MongoDB + Mongoose
+Used for server-side persistence and idempotent message ingestion via unique indexing.
+
+---
+
+# Project Structure
+
+```text
+SafeTrack/
+│
+├── android/
+├── ios/
+├── src/
+│   ├── database/
+│   │   ├── database.js
+│   │   ├── incidentRepository.js
+│   │   └── messageRepository.js
+│   ├── screens/
+│   │   ├── ConversationScreen.js
+│   │   ├── DashboardScreen.js
+│   │   ├── CreateIncidentScreen.js
+│   │   ├── IncidentDetailsScreen.js
+│   │   └── HistoryScreen.js
+│   ├── sync/
+│   │   └── SyncManager.js
+│   ├── config.js
+│   └── theme.js
+│
+├── backend/
+│   ├── src/
+│   │   ├── controllers/
+│   │   │   ├── incidentController.js
+│   │   │   └── messageController.js
+│   │   ├── models/
+│   │   │   ├── Incident.js
+│   │   │   └── Message.js
+│   │   ├── routes/
+│   │   │   ├── incidentRoutes.js
+│   │   │   └── messageRoutes.js
+│   │   └── app.js
+│   ├── tests/
+│   │   ├── incident.test.js
+│   │   └── message.test.js
+│   ├── server.js
+│   ├── package.json
+│   └── .env
+│
+├── scripts/
+│   └── verificationBenchmark.js
+├── __tests__/
+│   ├── App.test.tsx
+│   └── SyncManager.test.js
+├── App.tsx
+├── package.json
+├── jest.setup.js
+├── SUBMISSION.md
+└── README.md
+```
+
+---
+
+# Prerequisites
+
+Install the following before running the project:
+
+* **Node.js**: `v18.x` or higher
+* **npm**: `v9.x` or higher
+* **Android Studio & Android SDK**: Configured with Android platform tools
+* **Android device / Emulator**: Physical device connected via USB with USB debugging enabled, or an Android Virtual Device (AVD)
+* **MongoDB**: Running locally on port `27017` (e.g. via MongoDB Community Edition or Docker)
+
+---
+
+# Backend Setup
+
+From the `backend` directory (or the root `Backend` directory):
+
+```powershell
+cd backend
+npm install
+```
+
+Create or verify `.env` inside `backend/`:
+```env
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/safetrack
+NODE_ENV=development
+```
+
+> **Note:** Never commit `.env` or sensitive credentials to version control.
+
+Start the backend server:
+```powershell
+npm run dev
+```
+
+The server will listen at:
+```text
+http://localhost:5000
+```
+
+---
+
+# Mobile Setup
+
+### Step 1: Port Forwarding (USB Debugging / Emulator)
+Run port forwarding so Android connects directly to the backend over USB, bypassing local Wi-Fi router firewall blocks:
+```powershell
+adb reverse tcp:5000 tcp:5000
+```
+
+### Step 2: Install and Launch App
+From the project root:
+```powershell
+npm install
+
+# Start Metro Bundler:
 npm start
 
-# OR using Yarn
-yarn start
+# In a separate terminal, install and launch on Android:
+npx react-native run-android
 ```
 
-## Step 2: Build and run your app
+> **Note for Physical Devices:** If running wirelessly without ADB reverse, configure `src/config.js` with your development computer's local IP address: `http://<YOUR-PC-IP>:5000`.
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+---
 
-### Android
+# API Specification
 
-```sh
-# Using npm
-npm run android
+## 1. Create Message
+```http
+POST /api/messages
+Content-Type: application/json
 
-# OR using Yarn
-yarn android
+{
+  "clientMessageId": "msg_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+  "conversationId": "factory-safety-room-1",
+  "content": "Oil leakage detected near machine 4",
+  "createdAt": "2026-09-21T10:00:00.000Z"
+}
+```
+* **New Message**: Returns `201 Created` with saved document.
+* **Idempotent Retry**: Returns `200 OK` with existing document (no duplicate record created).
+* **Simulate 503**: Send header `x-simulate-failure: true` or body `simulateFailure: true`.
+* **Simulate Lost Ack**: Send header `x-simulate-lost-ack: true` or body `simulateLostAck: true`.
+
+## 2. Get Messages
+```http
+GET /api/messages?conversationId=factory-safety-room-1
+```
+Returns list of messages ordered by `createdAt ASC, _id ASC`.
+
+## 3. Reset Messages (Test Utility)
+```http
+DELETE /api/messages/reset?conversationId=factory-safety-room-1
+```
+Clears messages for testing and benchmarking.
+
+---
+
+# Offline Scenario
+
+### 1. Disable network
+Turn off Wi-Fi/mobile connectivity, or toggle **"Simulate Offline"** ON in the app's Reviewer Simulation Drawer.
+
+### 2. Send a message
+Create a safety message in the Factory Safety conversation.
+
+### 3. Local persistence
+The message is immediately stored in SQLite:
+```text
+Message
+   ↓
+SQLite
+   ↓
+PENDING (🕒 Amber badge)
 ```
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+### 4. Restore connectivity
+When the network becomes available:
+```text
+PENDING
+   ↓
+SENDING
+   ↓
+Backend
+   ↓
+MongoDB
+   ↓
+DELIVERED (✓ Delivered badge)
 ```
 
-Then, and every time you update your native dependencies, run:
+---
 
-```sh
-bundle exec pod install
+# Application Restart Scenario
+
+Offline messages are stored in SQLite rather than only in React state:
+```text
+Create message
+      ↓
+SQLite
+      ↓
+Force-close app / Reload Metro
+      ↓
+Open app
+      ↓
+Message remains available & resumes state
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+### Crash Recovery Guarantee
+If the app process is terminated while a message is in-flight (`sending`), `resetSendingMessagesLocal()` runs during SQLite initialization and safely restores it to `pending`.
 
-```sh
-# Using npm
-npm run ios
+---
 
-# OR using Yarn
-yarn ios
+# Failure and Retry
+
+If synchronization encounters a network failure or 5xx server error:
+```text
+SENDING
+   ↓
+ FAILED (Attempt 1 / 3)
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+The message remains locally available in the outbox.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+### Bounded Retries
+1. Retries are attempted automatically on network reconnection up to `MAX_AUTO_RETRIES = 3`.
+2. If all 3 attempts fail, the message transitions to a terminal failed state requiring explicit user action:
+```text
+FAILED (Terminal)
+   ↓
+Tap 'Retry'
+   ↓
+SENDING
+   ↓
+DELIVERED
+```
 
-## Step 3: Modify your app
+---
 
-Now that you have successfully run the app, let's make changes!
+# Message Ordering
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+Pending messages are processed according to their deterministic local creation order:
+```sql
+SELECT * FROM messages WHERE deliveryState = 'pending' ORDER BY createdAt ASC, id ASC
+```
+The Sync Manager processes queued messages sequentially in a FIFO pipeline. This guarantees that messages created offline arrive at the server in the exact sequence they were drafted.
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+---
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+# Idempotency
 
-## Congratulations! :tada:
+Every message receives a stable `clientMessageId` (UUID v4) prior to synchronization:
+```text
+clientMessageId = "msg_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+```
 
-You've successfully run and modified your React Native App. :partying_face:
+The exact same identifier is reused when the message is retried.
 
-### Now what?
+### Scenario: Lost Acknowledgement
+1. Client sends request with `clientMessageId`.
+2. Server writes message to MongoDB.
+3. Network connection drops before server's HTTP 201 reaches the client.
+4. Client marks message as `FAILED`.
+5. Client retries with the identical `clientMessageId`.
+6. Server receives repeated request, catches MongoDB duplicate key code `11000`, and returns `200 OK` with the existing record.
+7. Result: Client updates to `DELIVERED`, and **zero duplicate records** are created in MongoDB.
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+---
 
-# Troubleshooting
+# Testing
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+## 1. Mobile Automated Tests
+From the project root:
+```powershell
+npm test -- --no-cache --runInBand --forceExit
+```
 
-# Learn More
+**Observed Result:**
+```text
+PASS __tests__/SyncManager.test.js
+  SyncManager & Offline Outbox Tests
+    √ Scenario 1: Accepts outgoing message offline, stores locally, and shows pending state
+    √ Scenario 2: Synchronizes pending messages sequentially in FIFO order when connectivity returns
+    √ Scenario 3: Retries bounded up to MAX_AUTO_RETRIES (3) on temporary failure before marking failed
+    √ Scenario 4: Honors manual retry for failed messages and resets retry count
+    √ Scenario 5: Idempotency - Retries reuse clientMessageId preventing duplicate creations
+    √ Crash Recovery: Resets in-flight 'sending' messages back to 'pending' on startup
+    √ Stretch Goal: Drains messages added to outbox dynamically while sync is already active
+    √ Reviewer Tools: Simulates offline, temporary 503 errors, and lost acknowledgements
+PASS __tests__/App.test.tsx
 
-To learn more about React Native, take a look at the following resources:
+Test Suites: 2 passed, 2 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        1.397 s
+```
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+## 2. Backend Automated Tests
+From `backend`:
+```powershell
+cd backend
+npm test
+```
+
+**Observed Result:**
+```text
+PASS tests/incident.test.js
+PASS tests/message.test.js
+  Message API - Idempotency and Validation
+    √ should save a new message and return 201
+    √ should return the existing message when the same clientMessageId is sent again
+    √ should not create a second message for the same clientMessageId
+    √ should reject a message when required fields are missing
+    √ should return messages ordered by createdAt and _id
+    √ should simulate temporary failure (503) without saving message
+    √ should simulate lost acknowledgement: message saved but error returned, then idempotent retry succeeds with 200
+    √ should reset messages when requested
+
+Test Suites: 2 passed, 2 total
+Tests:       10 passed, 10 total
+Snapshots:   0 total
+Time:        1.85 s
+```
+
+---
+
+# Acceptance Scenarios
+
+## AC1 — Offline Send
+1. Open the Factory Safety conversation in the app.
+2. Tap the sliders icon (top right) and toggle **"Simulate Offline"** ON (or disconnect network).
+3. Send a message: *"Check pressure gauge on valve 3"*.
+4. **Verification**:
+   - Message appears immediately in the chat list.
+   - Message is stored durably in SQLite.
+   - Message displays an honest amber **`🕒 Pending`** status badge.
+
+## AC2 — Force-Close Durability
+1. While messages are in `pending` state, force-close the app or reload Metro (`R` twice).
+2. Reopen the application and navigate to the conversation.
+3. **Verification**:
+   - All messages and delivery states are restored from SQLite.
+   - If killed while in-flight (`sending`), the supervisor safely recovers it back to `pending`.
+
+## AC3 — Reconnection Sync
+1. Create one or more messages while offline.
+2. Toggle **"Simulate Offline"** OFF (or reconnect network).
+3. **Verification**:
+   - `SyncManager` detects network restoration.
+   - Messages are transmitted sequentially in FIFO order.
+   - Server commits messages to MongoDB.
+   - Local state transitions to green **`✓ Delivered`**.
+
+## AC4 — Temporary Failure and Retry
+1. Toggle **"Simulate 503 Temp Error"** ON in the Reviewer Simulation Drawer.
+2. Send a message.
+3. **Verification**:
+   - Backend returns HTTP 503.
+   - Message transitions to red **`⚠️ Failed (Attempt 1/3)`**.
+   - Auto-retries are bounded to 3 attempts.
+   - Toggle 503 OFF and tap the **"Retry"** button on the bubble.
+   - Message retries and successfully transitions to **`✓ Delivered`**.
+
+## AC5 — Idempotency (Uncertain Acknowledgement)
+1. Toggle **"Simulate Lost Ack"** ON in the Reviewer Simulation Drawer.
+2. Send a message.
+3. **Verification**:
+   - Backend saves to MongoDB, but client connection drops before response is received.
+   - Client displays **`⚠️ Failed`**.
+   - Tap **"Retry"**: Client sends the identical `clientMessageId`.
+   - Backend catches MongoDB duplicate key code `11000` and returns `200 OK`.
+   - Client reconciles to **`✓ Delivered`** with **zero duplicate records** in MongoDB.
+
+---
+
+# Verification Benchmark
+
+A repeatable automated benchmark validates the complete 5-step problem sequence:
+```powershell
+npm run benchmark
+```
+
+### Observed Benchmark Output
+```text
+========================================================================
+  SAFE TRACK - PROBLEM 2 VERIFICATION BENCHMARK
+========================================================================
+Total Messages Queued:            10
+Messages Persisted in Outbox:     10/10 (State: pending)
+Crash Recovery Validated:         Yes (in-flight 'sending' recovered to 'pending')
+Messages Synchronized:            10/10
+Simulated Temporary Error (503):  1 recovered (bench_msg_003)
+Simulated Lost Ack (AC5):         1 recovered idempotently (bench_msg_007)
+Duplicate Records Created:        0 (Unique constraint enforced)
+Backend Final Verification:       10/10 present in exact FIFO order
+Local Outbox Reconciled:          10/10 marked delivered
+Execution Status:                 PASS (Exit Code 0)
+========================================================================
+```
+
+---
+
+# Important Engineering Decisions
+
+## 1. Durable Local Outbox (SQLite)
+SQLite provides ACID guarantees so messages survive app backgrounding, crashes, and restarts. The outbox pattern decouples message creation from network availability.
+
+## 2. Stable Client-Generated Identifiers (UUID)
+`clientMessageId` is generated client-side upon creation. It stays immutable through all retry attempts, providing the backend with a deterministic deduplication token.
+
+## 3. Strict Sequential FIFO Synchronization
+Pending messages are sorted by `ORDER BY createdAt ASC, id ASC`. Sequential transmission preserves causal ordering for conversations.
+
+## 4. Head-of-Line Blocking vs. Bounded Retries
+To prevent a single corrupted message from indefinitely blocking subsequent messages, auto-retries are bounded to `MAX_AUTO_RETRIES = 3`. Once exhausted, the message enters a terminal failed state, allowing recovery via user retry.
+
+## 5. Crash Recovery Supervisor
+On startup, `resetSendingMessagesLocal()` checks for any messages left in `sending` state due to process termination and restores them to `pending`.
+
+## 6. Dynamic Queue Draining (Stretch Goal)
+A dynamic `while (hasPending)` loop inside `SyncManager` inspects the database at the end of each batch. Any messages created by the user while sync was active are processed seamlessly in the same pipeline.
+
+---
+
+# Assumptions and Limitations
+
+* **Single Conversation Scope**: The challenge focuses on a single factory safety conversation channel (`factory-safety-room-1`).
+* **Authentication**: User authentication is omitted to focus on offline state ownership and idempotency.
+* **Attachments**: Text messages only; media/audio attachments are out of scope.
+* **Inbound Real-time**: Focus is on outgoing client-to-server reliability. Server-to-client updates use optimistic reconciliation and query polling.
+* **Localhost Network Routing**: Development uses `adb reverse tcp:5000 tcp:5000` to tunnel local port 5000 over USB, avoiding router-level firewall issues.
+
+---
+
+# Production Improvements
+
+If preparing SafeTrack for enterprise factory deployment:
+* **Security**: Enforce TLS 1.3 / HTTPS, JWT-based authentication, and AES-256 SQLCipher encryption for local database at rest.
+* **Background Sync**: Integrate Android WorkManager (`react-native-background-actions`) to synchronize pending outbox messages while the app is backgrounded.
+* **Exponential Backoff with Jitter**: Use exponential backoff ($T = 2^n + \text{jitter}$) for automatic reconnection retries.
+* **Bidirectional Conflict Resolution**: Implement CRDTs (Conflict-free Replicated Data Types) or Vector Clocks for multi-worker offline concurrent edits.
+* **Observability**: Integrate structured OpenTelemetry tracing, Prometheus metrics for sync queue latencies, and Sentry for crash tracking.
+
+---
+
+# AI Usage
+
+AI tools were used during development for:
+* Reviewing challenge requirements and state machine edge cases.
+* Brainstorming crash recovery patterns and Head-of-Line blocking mitigation strategies.
+* Synthesizing automated test scenarios in Jest for idempotency and lost acknowledgements.
+* Assisting with documentation formatting and benchmark script generation.
+
+All architectural designs, database schemas, test executions, and verification benchmarks were authored, reviewed, executed, and validated by the author.
+
+---
+
+# Reviewer Demo Walkthrough
+
+Recommended sequence for review and video recording:
+
+1. **Reviewer Simulation Controls**:
+   - Open **Safety Conversation** on the phone.
+   - Tap the top-right sliders button to reveal the **Reviewer Simulation Panel**.
+   - Review the metrics row (`Pending`, `Sending`, `Failed`, `Delivered`) and simulation switches.
+
+2. **Offline Send & Durability (AC1 & AC2)**:
+   - Toggle **Simulate Offline** ON.
+   - Send *"Machine #4 hydraulic seal inspection"*.
+   - Point out the honest `🕒 Pending` amber badge.
+   - Reload the app (`R` twice): the message persists intact from SQLite.
+
+3. **Temporary Failure & Recovery (AC4)**:
+   - Toggle **Simulate 503 Temp Error** ON.
+   - Toggle **Simulate Offline** OFF.
+   - Message attempts transmission and transitions to `⚠️ Failed (Attempt 1/3)`.
+   - Toggle 503 OFF and tap **Retry**: message reconciles to `✓ Delivered`.
+
+4. **Lost Acknowledgement & Zero Duplicates (AC5)**:
+   - Toggle **Simulate Lost Ack** ON.
+   - Send a message: backend saves to MongoDB, but client connection drops.
+   - Message turns red `⚠️ Failed`.
+   - Tap **Retry**: client sends the same `clientMessageId`; server detects duplicate and returns HTTP 200; client updates to `✓ Delivered` without creating duplicate records.
+
+5. **Repeatable Benchmark Command**:
+   - Run `npm run benchmark` in terminal.
+   - Highlight the 10/10 messages verified in MongoDB in exact FIFO order.
+
+---
+
+# Repository
+
+**Candidate:** Maheshwari (`maheshwari3044@gmail.com`)  
+**GitHub Repository:** [https://github.com/Maheshwari3/SafeTrack---Caygnus-Product-Engineering-Challenge](https://github.com/Maheshwari3/SafeTrack---Caygnus-Product-Engineering-Challenge)  
+**Selected Problem:** Problem 2 — Offline-Capable Mobile Conversation  
+**Project:** SafeTrack  

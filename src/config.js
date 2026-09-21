@@ -1,8 +1,7 @@
 // Central API configuration for SafeTrack
-// PC local Wi-Fi IP address: 10.187.218.9
-// This allows physical phones on the same Wi-Fi to sync even without USB cable!
+// Using http://localhost:5000 with 'adb reverse tcp:5000 tcp:5000'.
+// This communicates directly over USB loopback, bypassing Windows Firewall blocks.
 
-export const API_BASE_URL = 'http://10.187.218.9:5000';
+export const API_BASE_URL = 'http://localhost:5000';
 export const INCIDENTS_API_URL = `${API_BASE_URL}/api/incidents`;
-export const MESSAGES_API_URL =
-    `${API_BASE_URL}/api/messages`;
+export const MESSAGES_API_URL = `${API_BASE_URL}/api/messages`;

@@ -14,7 +14,7 @@ import { MESSAGES_API_URL } from '../config';
 const API_URL = MESSAGES_API_URL;
 
 // Maximum number of automatic attempts for one message.
-const MAX_AUTO_RETRIES = 3;
+export const MAX_AUTO_RETRIES = 3;
 
 class SyncManager {
   constructor() {
@@ -22,6 +22,13 @@ class SyncManager {
     this.isSyncing = false;
     this.isInitialized = false;
     this.unsubscribeNetwork = null;
+
+    // Reviewer and test simulation controls
+    this.simulateOffline = false;
+    this.simulateFailure = false;
+    this.simulateLostAck = false;
+
+    this.apiUrl = MESSAGES_API_URL;
   }
 
   init() {
@@ -31,179 +38,256 @@ class SyncManager {
 
     this.isInitialized = true;
 
-    // Crash recovery:
-    // If the app was terminated while a message was being sent,
-    // we don't know whether the backend received it.
-    // Move it back to pending so it can safely be retried.
-    resetSendingMessagesLocal();
+    // Crash recovery (AC2):
+    // If the app was terminated while a message was in 'sending' state,
+    // we don't know whether the backend received it or not.
+    // Move it back to 'pending' so it can safely be retried idempotently.
+    resetSendingMessagesLocal().catch((err) => {
+      console.error('Failed to reset sending messages on init:', err);
+    });
 
     this.unsubscribeNetwork = NetInfo.addEventListener((state) => {
       const wasOffline = !this.isOnline;
-      const isNowOnline = state.isConnected === true;
+      const isNowOnline = state.isConnected === true && !this.simulateOffline;
 
       this.isOnline = isNowOnline;
 
-      console.log(
-        'Network state changed. Online:',
-        this.isOnline
-      );
+      console.log('Network state changed. Online:', this.isOnline);
 
-      // Connectivity returned.
+      // Connectivity returned (AC3)
       if (wasOffline && isNowOnline) {
         this.syncPendingMessages();
       }
     });
+
+    // Check initial state
+    NetInfo.fetch().then((state) => {
+      this.isOnline = state.isConnected === true && !this.simulateOffline;
+      if (this.isOnline) {
+        this.syncPendingMessages();
+      }
+    }).catch(() => {});
+  }
+
+  // Set offline simulation mode for reviewers and tests
+  setSimulateOffline(enabled) {
+    this.simulateOffline = Boolean(enabled);
+    if (this.simulateOffline) {
+      this.isOnline = false;
+    } else {
+      NetInfo.fetch().then((state) => {
+        const wasOffline = !this.isOnline;
+        this.isOnline = state.isConnected === true;
+        if (wasOffline && this.isOnline) {
+          this.syncPendingMessages();
+        }
+      }).catch(() => {
+        this.isOnline = true;
+      });
+    }
+  }
+
+  // Set backend failure simulation (503 temporary error)
+  setSimulateFailure(enabled) {
+    this.simulateFailure = Boolean(enabled);
+  }
+
+  // Set backend lost acknowledgement simulation (saved on backend, response dropped)
+  setSimulateLostAck(enabled) {
+    this.simulateLostAck = Boolean(enabled);
   }
 
   async syncPendingMessages({ manualRetry = false } = {}) {
-    if (this.isSyncing || !this.isOnline) {
+    // Effective online check considering reviewer simulation
+    const effectiveOnline = this.isOnline && !this.simulateOffline;
+
+    if (this.isSyncing || !effectiveOnline) {
       return;
     }
 
     this.isSyncing = true;
 
     try {
-      const messages = await getPendingMessages();
+      // Loop to drain all messages, including messages added while sync is in progress (stretch goal)
+      let continueDraining = true;
 
-      let messagesToSync;
+      while (continueDraining && (this.isOnline && !this.simulateOffline)) {
+        const messages = (await getPendingMessages()) || [];
 
-      if (manualRetry) {
-        // Manual retry can recover messages that exhausted
-        // their automatic retry limit.
-        messagesToSync = messages;
-      } else {
-        // Automatic retry is bounded.
-        messagesToSync = messages.filter((message) => {
-          if (message.deliveryState === 'pending') {
-            return true;
-          }
+        let messagesToSync;
 
-          if (message.deliveryState === 'sending') {
-            return true;
-          }
+        if (manualRetry) {
+          // Manual retry can recover messages that exhausted their automatic retry limit
+          messagesToSync = messages;
+        } else {
+          // Automatic retry is bounded (AC4)
+          messagesToSync = messages.filter((message) => {
+            if (message.deliveryState === 'pending') {
+              return true;
+            }
+            if (message.deliveryState === 'sending') {
+              return true;
+            }
+            if (message.deliveryState === 'failed') {
+              return (message.retryCount || 0) < MAX_AUTO_RETRIES;
+            }
+            return false;
+          });
+        }
 
-          if (message.deliveryState === 'failed') {
-            return message.retryCount < MAX_AUTO_RETRIES;
-          }
-
-          return false;
-        });
-      }
-
-      if (messagesToSync.length === 0) {
-        this.isSyncing = false;
-        return;
-      }
-
-      console.log(
-        `Starting message sync for ${messagesToSync.length} message(s)...`
-      );
-
-      // IMPORTANT:
-      // We process one message at a time.
-      // This preserves our documented ordering policy.
-      for (const message of messagesToSync) {
-        if (!this.isOnline) {
-          console.log(
-            'Network lost during sync. Pausing...'
-          );
+        if (!messagesToSync || messagesToSync.length === 0) {
           break;
         }
 
-        try {
-          // Manual retry resets the retry counter first.
-          if (
-            manualRetry &&
-            message.deliveryState === 'failed'
-          ) {
-            await resetMessageForManualRetryLocal(
-              message.clientMessageId
-            );
+        console.log(`Processing sync batch for ${messagesToSync.length} message(s)...`);
+
+        let networkHalted = false;
+
+        // Process one message at a time in strict FIFO order (createdAt ASC, id ASC)
+        for (const message of messagesToSync) {
+          if (!this.isOnline || this.simulateOffline) {
+            console.log('Network lost during sync. Pausing queue...');
+            networkHalted = true;
+            break;
           }
 
-          // pending → sending
-          await updateMessageStateLocal(
-            message.clientMessageId,
-            'sending'
-          );
+          try {
+            // If message was in failed state and manual retry is running, reset counter first
+            if (manualRetry && message.deliveryState === 'failed') {
+              await resetMessageForManualRetryLocal(message.clientMessageId);
+            }
 
-          DeviceEventEmitter.emit('messageSyncUpdated');
+            // Transition: pending/failed → sending
+            await updateMessageStateLocal(message.clientMessageId, 'sending');
+            DeviceEventEmitter.emit('messageSyncUpdated');
 
-          const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
+            const headers = {
               'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              clientMessageId: message.clientMessageId,
-              conversationId: message.conversationId,
-              content: message.content,
-              createdAt: message.createdAt,
-            }),
-          });
+            };
 
-          if (response.ok) {
-            // 201 = newly created
-            // 200 = idempotent retry / existing message
-            await updateMessageStateLocal(
-              message.clientMessageId,
-              'delivered'
-            );
+            // Reviewer simulation headers
+            if (this.simulateFailure) {
+              headers['x-simulate-failure'] = 'true';
+            }
+            if (this.simulateLostAck) {
+              headers['x-simulate-lost-ack'] = 'true';
+              // Consume one-shot lost ack if desired, or keep until toggled
+            }
 
-            console.log(
-              `Message delivered: ${message.clientMessageId}`
-            );
-          } else {
+            const requestOptions = {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                clientMessageId: message.clientMessageId,
+                conversationId: message.conversationId,
+                content: message.content,
+                createdAt: message.createdAt,
+                simulateFailure: this.simulateFailure,
+                simulateLostAck: this.simulateLostAck,
+              }),
+            };
+
+            let response;
+            try {
+              response = await fetch(this.apiUrl, requestOptions);
+            } catch (initialError) {
+              const fallback = this.apiUrl.includes('localhost')
+                ? 'http://10.102.115.9:5000/api/messages'
+                : 'http://localhost:5000/api/messages';
+
+              try {
+                const altRes = await fetch(fallback, requestOptions);
+                if (altRes && typeof altRes.status === 'number') {
+                  response = altRes;
+                  this.apiUrl = fallback;
+                  console.log(`Switched active messages API endpoint to: ${fallback}`);
+                } else {
+                  throw initialError;
+                }
+              } catch {
+                throw initialError;
+              }
+            }
+
+            if (response.ok) {
+              // HTTP 201 = newly created on server
+              // HTTP 200 = idempotent retry of existing message (AC5)
+              await updateMessageStateLocal(message.clientMessageId, 'delivered');
+              console.log(`Message delivered successfully: ${message.clientMessageId}`);
+            } else if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+              // Non-retryable client validation error (permanent failure)
+              await updateMessageFailedLocal(
+                message.clientMessageId,
+                `Client Error: ${response.status}`
+              );
+              console.log(`Message permanently failed (4xx): ${message.clientMessageId}`);
+            } else {
+              // Temporary server failure (5xx or 429) (AC4)
+              await updateMessageFailedLocal(
+                message.clientMessageId,
+                `Server Error: ${response.status}`
+              );
+              console.log(`Temporary server error (${response.status}) for: ${message.clientMessageId}`);
+
+              // In strict FIFO ordering: temporary failure pauses subsequent dependent messages
+              // so they are not delivered out-of-order.
+              networkHalted = true;
+              break;
+            }
+          } catch (error) {
+            // Network error (timeout, connection refused, DNS failure)
             await updateMessageFailedLocal(
               message.clientMessageId,
-              `Server Error: ${response.status}`
+              error.message || 'Network error'
             );
+            console.log(`Network error for message: ${message.clientMessageId} - ${error.message}`);
 
-            console.log(
-              `Message failed: ${message.clientMessageId}`
-            );
+            // Network issue encountered - pause processing remaining messages in this cycle
+            networkHalted = true;
+            break;
           }
-        } catch (error) {
-          await updateMessageFailedLocal(
-            message.clientMessageId,
-            error.message || 'Network error'
-          );
 
-          console.log(
-            `Network error for message: ${message.clientMessageId}`
-          );
+          DeviceEventEmitter.emit('messageSyncUpdated');
         }
 
-        DeviceEventEmitter.emit('messageSyncUpdated');
+        if (networkHalted) {
+          break;
+        }
       }
     } catch (error) {
-      console.error(
-        'Error in message SyncManager:',
-        error
-      );
+      console.error('Error in message SyncManager:', error);
     } finally {
       this.isSyncing = false;
-
+      DeviceEventEmitter.emit('messageSyncUpdated');
       DeviceEventEmitter.emit('messageSyncFinished');
+      DeviceEventEmitter.emit('syncFinished');
     }
   }
 
-  // Manual retry button can call this method.
+  // Force sync / Manual retry for all failed or pending messages
   async forceSync() {
-    const state = await NetInfo.fetch();
-
-    if (!state.isConnected) {
-      console.warn(
-        'Cannot sync messages: device is offline'
-      );
+    if (this.simulateOffline) {
+      console.log('Cannot sync messages: simulation is set to offline');
       return;
     }
 
-    this.isOnline = true;
+    try {
+      const state = await NetInfo.fetch();
+      this.isOnline = state.isConnected === true;
+    } catch {
+      this.isOnline = true;
+    }
 
     await this.syncPendingMessages({
       manualRetry: true,
     });
+  }
+
+  // Manual retry for a specific message by ID
+  async retryMessage(clientMessageId) {
+    await resetMessageForManualRetryLocal(clientMessageId);
+    DeviceEventEmitter.emit('messageSyncUpdated');
+    await this.forceSync();
   }
 
   destroy() {
@@ -211,8 +295,8 @@ class SyncManager {
       this.unsubscribeNetwork();
       this.unsubscribeNetwork = null;
     }
-
     this.isInitialized = false;
+    this.isSyncing = false;
   }
 }
 

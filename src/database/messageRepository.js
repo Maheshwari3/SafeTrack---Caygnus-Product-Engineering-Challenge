@@ -199,3 +199,27 @@ export const resetMessageForManualRetryLocal = async (
 
     return db.executeSql(query, [clientMessageId]);
 };
+
+export const getMessageByIdLocal = async (clientMessageId) => {
+    const db = await getDBConnection();
+    const query = 'SELECT * FROM messages WHERE clientMessageId = ? LIMIT 1';
+    try {
+        const [results] = await db.executeSql(query, [clientMessageId]);
+        if (results.rows.length > 0) {
+            return results.rows.item(0);
+        }
+        return null;
+    } catch (error) {
+        console.error('Error fetching message by id:', error);
+        throw error;
+    }
+};
+
+export const clearAllMessagesLocal = async (conversationId) => {
+    const db = await getDBConnection();
+    const query = conversationId
+        ? 'DELETE FROM messages WHERE conversationId = ?'
+        : 'DELETE FROM messages';
+    const params = conversationId ? [conversationId] : [];
+    return db.executeSql(query, params);
+};

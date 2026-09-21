@@ -25,6 +25,12 @@ function App() {
       })
       .catch(console.error);
 
+    return () => {
+      SyncManager.destroy();
+    };
+  }, []);
+
+  useEffect(() => {
     const backAction = () => {
       if (currentRoute.name !== 'Dashboard') {
         setCurrentRoute({ name: 'Dashboard', params: {} });
