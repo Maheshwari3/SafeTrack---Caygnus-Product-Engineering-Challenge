@@ -673,67 +673,90 @@ A dynamic `while (hasPending)` loop inside `SyncManager` inspects the database a
 
 # Assumptions and Limitations
 
-* **Single Conversation Scope**: The challenge focuses on a single factory safety conversation channel (`factory-safety-room-1`).
-* **Authentication**: User authentication is omitted to focus on offline state ownership and idempotency.
-* **Attachments**: Text messages only; media/audio attachments are out of scope.
-* **Inbound Real-time**: Focus is on outgoing client-to-server reliability. Server-to-client updates use optimistic reconciliation and query polling.
-* **Localhost Network Routing**: Development uses `adb reverse tcp:5000 tcp:5000` to tunnel local port 5000 over USB, avoiding router-level firewall issues.
+The current implementation focuses on the challenge requirements:
+
+* **Authentication & Profiles**: Outside the scope of the challenge.
+* **Attachments**: Images, audio, and video are not supported; text only.
+* **Incoming Real-time**: Focus is on outgoing offline messages and their synchronization lifecycle.
+* **Prototype Backend**: Intended as a challenge prototype running locally.
+* **Background Sync**: Background synchronization while the application is completely terminated is not implemented.
+* **Production Deployment**: Requires HTTPS, JWT authentication, and security monitoring.
 
 ---
 
 # Production Improvements
 
-If preparing SafeTrack for enterprise factory deployment:
-* **Security**: Enforce TLS 1.3 / HTTPS, JWT-based authentication, and AES-256 SQLCipher encryption for local database at rest.
-* **Background Sync**: Integrate Android WorkManager (`react-native-background-actions`) to synchronize pending outbox messages while the app is backgrounded.
-* **Exponential Backoff with Jitter**: Use exponential backoff ($T = 2^n + \text{jitter}$) for automatic reconnection retries.
-* **Bidirectional Conflict Resolution**: Implement CRDTs (Conflict-free Replicated Data Types) or Vector Clocks for multi-worker offline concurrent edits.
-* **Observability**: Integrate structured OpenTelemetry tracing, Prometheus metrics for sync queue latencies, and Sentry for crash tracking.
+The submitted implementation focuses on the core challenge requirements:
+* Offline persistence
+* Durable local outbox
+* Connectivity-aware synchronization
+* Failure handling
+* Retry/recovery
+* Ordering
+* Idempotent message ingestion
+
+For production, the following improvements are recommended:
+
+### Security
+* HTTPS
+* Authentication & Authorization
+* Secure credential handling
+* Input validation & Rate limiting
+
+### Synchronization
+* Background synchronization via Android WorkManager
+* Exponential backoff with jitter
+* Stronger acknowledgement handling
+* Conflict resolution for bidirectional synchronization
+
+### Backend Scalability
+* Database indexing & Pagination
+* Connection pooling & Horizontal scaling
+* Queue-based processing where appropriate
+* Production database monitoring
+
+### Observability
+* Structured logging & Metrics
+* Distributed tracing & Error tracking
+* Synchronization monitoring & Alerting
+
+### Testing & Delivery
+* Integration & End-to-end tests
+* Failure-injection tests
+* Device-level testing & CI/CD automation
 
 ---
 
 # AI Usage
 
 AI tools were used during development for:
-* Reviewing challenge requirements and state machine edge cases.
-* Brainstorming crash recovery patterns and Head-of-Line blocking mitigation strategies.
-* Synthesizing automated test scenarios in Jest for idempotency and lost acknowledgements.
-* Assisting with documentation formatting and benchmark script generation.
+* Understanding challenge requirements
+* Discussing architecture and implementation approaches
+* Debugging development issues
+* Reviewing implementation details
+* Assisting with code and documentation
 
-All architectural designs, database schemas, test executions, and verification benchmarks were authored, reviewed, executed, and validated by the author.
+AI-generated suggestions were reviewed and adapted during implementation. Application behavior was manually tested during development.
 
 ---
 
-# Reviewer Demo Walkthrough
+# Demo
 
-Recommended sequence for review and video recording:
+The demo should show the complete offline-to-online workflow:
 
-1. **Reviewer Simulation Controls**:
-   - Open **Safety Conversation** on the phone.
-   - Tap the top-right sliders button to reveal the **Reviewer Simulation Panel**.
-   - Review the metrics row (`Pending`, `Sending`, `Failed`, `Delivered`) and simulation switches.
-
-2. **Offline Send & Durability (AC1 & AC2)**:
-   - Toggle **Simulate Offline** ON.
-   - Send *"Machine #4 hydraulic seal inspection"*.
-   - Point out the honest `🕒 Pending` amber badge.
-   - Reload the app (`R` twice): the message persists intact from SQLite.
-
-3. **Temporary Failure & Recovery (AC4)**:
-   - Toggle **Simulate 503 Temp Error** ON.
-   - Toggle **Simulate Offline** OFF.
-   - Message attempts transmission and transitions to `⚠️ Failed (Attempt 1/3)`.
-   - Toggle 503 OFF and tap **Retry**: message reconciles to `✓ Delivered`.
-
-4. **Lost Acknowledgement & Zero Duplicates (AC5)**:
-   - Toggle **Simulate Lost Ack** ON.
-   - Send a message: backend saves to MongoDB, but client connection drops.
-   - Message turns red `⚠️ Failed`.
-   - Tap **Retry**: client sends the same `clientMessageId`; server detects duplicate and returns HTTP 200; client updates to `✓ Delivered` without creating duplicate records.
-
-5. **Repeatable Benchmark Command**:
-   - Run `npm run benchmark` in terminal.
-   - Highlight the 10/10 messages verified in MongoDB in exact FIFO order.
+1. Open SafeTrack.
+2. Show the Factory Safety conversation.
+3. Send a message while online.
+4. Disable network connectivity (or toggle Simulate Offline ON).
+5. Send a message while offline.
+6. Show that the message appears immediately with pending state.
+7. Force-close the application / reload Metro.
+8. Reopen the application and show that the message is still available.
+9. Restore network connectivity (or toggle Simulate Offline OFF).
+10. Show synchronization and message becoming delivered.
+11. Demonstrate a temporary synchronization failure (toggle 503 ON).
+12. Show the failed state, toggle 503 OFF, and tap Retry to deliver.
+13. Demonstrate duplicate prevention using `clientMessageId` (toggle Lost Ack ON, retry).
 
 ---
 

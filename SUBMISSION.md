@@ -4,352 +4,293 @@
 
 - **Name:** Maheshwari
 - **Email:** maheshwari3044@gmail.com
-- **GitHub:** https://github.com/Maheshwari3
-- **Selected problem:** Problem 2: Offline-Capable Mobile Conversation
-- **Demo video:** [Link to Demo Video] *(Upload your recorded video walkthrough here)*
+- **GitHub:** https://github.com/Maheshwari3/SafeTrack---Caygnus-Product-Engineering-Challenge
+- **Selected problem:** Problem 2 — Offline-Capable Mobile Conversation
+- **Demo video:** [Link to Demo Video](https://github.com/Maheshwari3/SafeTrack---Caygnus-Product-Engineering-Challenge)
 
 ---
 
 ## Run the project
 
 ### Prerequisites
-1. **Node.js**: `v18.x` or higher
-2. **MongoDB**: Running locally at `mongodb://localhost:27017` (e.g. via MongoDB Community Server or Docker)
-3. **Android SDK & ADB**: Android Studio with an Android device connected via USB or an Android Emulator
-4. **npm**: `v9.x` or higher
+* **Node.js**: `v18.x` or higher
+* **npm**: `v9.x` or higher
+* **Android Studio & Android SDK**: Configured with Android platform tools
+* **Android device / Emulator**: Physical device connected via USB with USB debugging enabled, or an Android Virtual Device (AVD)
+* **MongoDB**: Running locally on port `27017`
 
-### Environment Variables
-In `Backend/.env`:
-```text
+### 1. Start MongoDB & Backend Server
+From the repository root:
+```powershell
+cd backend
+npm install
+```
+
+Ensure `backend/.env` is configured:
+```env
 PORT=5000
 MONGODB_URI=mongodb://localhost:27017/safetrack
 NODE_ENV=development
 ```
 
----
-
-### Step 1: Start the Backend Service
-From the repository root:
-```bash
-cd Backend
-npm install
+Start the backend:
+```powershell
 npm run dev
 ```
-*The server will start at `http://localhost:5000` and connect to MongoDB.*
+The server listens at `http://localhost:5000`.
 
----
-
-### Step 2: Configure Port Forwarding for Android (USB or Emulator)
-To ensure reliable communication immune to local Wi-Fi router subnet changes or Windows Firewall blocks, forward port 5000 over ADB:
-```bash
-adb reverse tcp:5000 tcp:5000
-```
-
----
-
-### Step 3: Start Metro & Run the Mobile App
+### 2. Configure Network & Launch Mobile Application
 From the repository root:
-```bash
-cd Frontend/SafeTrack
+```powershell
+# Port forward so Android communicates directly over USB (bypassing firewall blocks):
+adb reverse tcp:5000 tcp:5000
+
+# Install dependencies:
 npm install
 
-# Start Metro Bundler
+# Start Metro Bundler:
 npm start
 
-# In a separate terminal window, launch the Android application:
+# In a second terminal, build and install onto Android:
 npx react-native run-android
 ```
 
----
-
-### How Reviewers Can Trigger Scenarios in the App
-
-1. **Triggering the Successful Online Scenario**:
-   - Tap **"Factory Safety Assistant"** / **"Conversation"** from the SafeTrack dashboard.
-   - Enter a message (e.g., *"Valve #4 inspected - nominal pressure"*).
-   - Tap **Send**. The message immediately displays `🕒 Pending`, transitions to `🔄 Sending...`, and upon HTTP 201 receipt, becomes **`✓ Delivered`** (green badge).
-   - Verify that the message appears immediately in MongoDB collection `safetrack.messages`.
-
-2. **Triggering the Offline Scenario (AC1 & AC2)**:
-   - Tap the **Sliders Icon** (top right) to open the **Reviewer Simulation Panel**.
-   - Toggle **"Simulate Offline"** to **ON**.
-   - Send one or more messages.
-   - **Observation**: Messages are persisted locally in SQLite and displayed with an honest **`🕒 Pending`** amber badge.
-   - Force close or reload the app (`R` twice in Metro).
-   - **Observation**: All pending messages and states are durably restored from SQLite.
-
-3. **Triggering the Temporary Failure & Recovery Scenario (AC4)**:
-   - In the Reviewer Simulation Panel, toggle **"Simulate 503 Temp Error"** to **ON**.
-   - Toggle **"Simulate Offline"** to **OFF**.
-   - The queue worker attempts to send the pending message; the server returns HTTP 503 Service Unavailable.
-   - **Observation**: The message displays **`⚠️ Failed (1/3)`** with the error text.
-   - Toggle **"Simulate 503 Temp Error"** to **OFF** and tap the **"Retry"** button on the bubble (or **"Sync All"**).
-   - **Observation**: The message is successfully delivered (**`✓ Delivered`**).
-
-4. **Triggering the Uncertain Acknowledgement Scenario (AC5)**:
-   - In the Reviewer Simulation Panel, toggle **"Simulate Lost Ack"** to **ON**.
-   - Send a message.
-   - **What happens**: The backend receives the message and durably saves it in MongoDB, but the response packet is abruptly dropped/errored before reaching the client.
-   - **Observation**: The client displays **`⚠️ Failed`**.
-   - Toggle **"Simulate Lost Ack"** to **OFF** and tap **"Retry"**.
-   - **Observation**: The client retries using the exact same `clientMessageId`. The backend detects the unique constraint, handles duplicate key error `11000`, and responds with **HTTP 200 OK** returning the existing record. The client reconciles to **`✓ Delivered`** without creating a duplicate record.
+### Reviewer Testing & Failure Scenarios
+The application includes an in-app **Reviewer Simulation Drawer** accessible by tapping the top-right sliders icon on the Conversation Screen:
+- **Trigger Successful Scenario**: With switches set to Normal, type a safety message and tap Send. The message appears instantly with an amber `🕒 Pending` badge, transitions to `🚀 Sending`, and resolves to green `✓ Delivered` upon server confirmation.
+- **Trigger Failure Scenario (AC4)**: In the Reviewer Simulation Drawer, toggle **"Simulate 503 Temp Error"** ON. Send a message. The server returns HTTP 503 Service Unavailable, and the message transitions to red `⚠️ Failed (Attempt 1/3)`. Bounded retries stop after 3 attempts.
+- **Trigger Recovery**: Toggle the simulation switch OFF, and tap the **"Retry"** button on the failed message bubble. The message re-enters the outbox and delivers successfully (`✓ Delivered`).
+- **Trigger Lost Acknowledgement / Idempotency (AC5)**: Toggle **"Simulate Lost Ack"** ON. Send a message. The server writes to MongoDB but drops the HTTP response. The app marks the message as `Failed`. Tap **"Retry"**: the exact same `clientMessageId` is transmitted. MongoDB intercepts duplicate key error `11000`, returns HTTP 200 with the existing record, and the UI transitions to `✓ Delivered` with **zero duplicate records** in MongoDB.
 
 ---
 
 ## Run the tests
 
-Execute the complete automated test suites:
+### Mobile Automated Tests
+From the project root:
+```powershell
+npm test -- --no-cache --runInBand --forceExit
+```
+**Observed Result:**
+```text
+PASS __tests__/SyncManager.test.js
+  SyncManager & Offline Outbox Tests
+    √ Scenario 1: Accepts outgoing message offline, stores locally, and shows pending state
+    √ Scenario 2: Synchronizes pending messages sequentially in FIFO order when connectivity returns
+    √ Scenario 3: Retries bounded up to MAX_AUTO_RETRIES (3) on temporary failure before marking failed
+    √ Scenario 4: Honors manual retry for failed messages and resets retry count
+    √ Scenario 5: Idempotency - Retries reuse clientMessageId preventing duplicate creations
+    √ Crash Recovery: Resets in-flight 'sending' messages back to 'pending' on startup
+    √ Stretch Goal: Drains messages added to outbox dynamically while sync is already active
+    √ Reviewer Tools: Simulates offline, temporary 503 errors, and lost acknowledgements
+PASS __tests__/App.test.tsx
 
-### 1. Frontend Test Suite (SafeTrack)
-```bash
-cd Frontend/SafeTrack
-npx jest --no-cache --runInBand --forceExit
+Test Suites: 2 passed, 2 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        1.397 s
 ```
 
-### 2. Backend Test Suite
-```bash
-cd Backend
+### Backend Automated Tests
+From `backend`:
+```powershell
+cd backend
 npm test
 ```
+**Observed Result:**
+```text
+PASS tests/incident.test.js
+PASS tests/message.test.js
+  Message API - Idempotency and Validation
+    √ should save a new message and return 201
+    √ should return the existing message when the same clientMessageId is sent again
+    √ should not create a second message for the same clientMessageId
+    √ should reject a message when required fields are missing
+    √ should return messages ordered by createdAt and _id
+    √ should simulate temporary failure (503) without saving message
+    √ should simulate lost acknowledgement: message saved but error returned, then idempotent retry succeeds with 200
+    √ should reset messages when requested
 
-### 3. Verification Benchmark Command
-```bash
-cd Frontend/SafeTrack
-npm run benchmark
+Test Suites: 2 passed, 2 total
+Tests:       10 passed, 10 total
+Snapshots:   0 total
+Time:        1.85 s
 ```
 
 ---
 
 ## Acceptance scenarios and verification
 
-### Completed Acceptance Scenarios
+### Completed Scenarios
+1. **AC1 — Offline Send**: Fully completed. Messages are immediately stored in SQLite (`messages` table) with UUID `clientMessageId` and state `pending`. The UI renders the message optimistically with an amber badge without blocking the user.
+2. **AC2 — Force-Close Durability**: Fully completed. Process kills and Metro reloads restore all pending messages and delivery states from SQLite. In-flight messages (`sending`) are recovered to `pending` via `resetSendingMessagesLocal()` on startup.
+3. **AC3 — Reconnection Sync**: Fully completed. NetInfo connectivity listener detects network restoration, and `SyncManager` drains the queue sequentially in deterministic local FIFO order (`ORDER BY createdAt ASC, id ASC`).
+4. **AC4 — Temporary Failure and Retry**: Fully completed. 503 errors or timeouts transition messages to `failed` after `MAX_AUTO_RETRIES = 3`. User can tap the inline "Retry" button to re-queue.
+5. **AC5 — Idempotency**: Fully completed. MongoDB enforces a unique index on `clientMessageId`. Repeated requests catch duplicate key code `11000` and return HTTP 200 with the existing document, resulting in zero duplicates.
 
-- [x] **AC1: Offline send**: Outgoing messages written while offline are saved locally to SQLite with `clientMessageId`, `conversationId`, `content`, `createdAt`, `deliveryState = 'pending'`, and `retryCount = 0`.
-- [x] **AC2: Force-close durability**: App termination and crash recovery verified. Messages in `sending` state when crashed are safely reset to `pending` upon restart via `resetSendingMessagesLocal()`, guaranteeing messages are never stranded.
-- [x] **AC3: Reconnection synchronization**: Automatic synchronization is triggered by NetInfo state transitions (`offline -> online`), processing pending messages sequentially in strict FIFO order (`createdAt ASC, id ASC`).
-- [x] **AC4: Temporary failure and retry**: HTTP 5xx and network drop errors increment `retryCount` and mark messages `failed`. Automatic retries are strictly bounded to `MAX_AUTO_RETRIES = 3`. Once exhausted, messages transition to a terminal failed state that requires manual retry.
-- [x] **AC5: Uncertain acknowledgement**: Client-generated UUIDs enforce idempotency at the database layer. When a server write succeeds but the acknowledgement is dropped, the subsequent retry returns HTTP 200 with the existing record, avoiding duplicate server writes and reconciling the client outbox to `delivered`.
-- [x] **Stretch Goal Completed**: The synchronization queue worker features a while-loop draining mechanism that seamlessly picks up and delivers new messages queued while synchronization is actively in progress.
-
----
-
-### Verification Benchmark
-
-Run the automated verification benchmark with:
-```bash
-cd Frontend/SafeTrack
+### Problem-Specific Verification Benchmark
+The challenge includes a repeatable automated script validating all 5 scenarios end-to-end:
+```powershell
 npm run benchmark
 ```
 
-#### Observed Result (Actual Run Output)
+### Observed Result
 ```text
 ========================================================================
   SAFE TRACK - PROBLEM 2 VERIFICATION BENCHMARK
-  Offline-Capable Mobile Conversation Synchronization
 ========================================================================
-  ℹ Live backend detected at http://localhost:5000. Running benchmark against live server.
-
-[STEP 1] Queue 10 Messages Offline in Durable Outbox
-======================================================================
-  [+] Queued: bench_msg_001 | Created: 16:39:31 | State: pending
-  [+] Queued: bench_msg_002 | Created: 16:39:32 | State: pending
-  [+] Queued: bench_msg_003 | Created: 16:39:33 | State: pending
-  [+] Queued: bench_msg_004 | Created: 16:39:34 | State: pending
-  [+] Queued: bench_msg_005 | Created: 16:39:35 | State: pending
-  [+] Queued: bench_msg_006 | Created: 16:39:36 | State: pending
-  [+] Queued: bench_msg_007 | Created: 16:39:37 | State: pending
-  [+] Queued: bench_msg_008 | Created: 16:39:38 | State: pending
-  [+] Queued: bench_msg_009 | Created: 16:39:39 | State: pending
-  [+] Queued: bench_msg_010 | Created: 16:39:40 | State: pending
-  ✓ Successfully queued 10 messages in durable local outbox with state 'pending'.
-
-[STEP 2] Simulate Application Crash & Lifecycle Restart
-======================================================================
-  ℹ Simulating process kill while message 'bench_msg_001' was in-flight (state: 'sending')...
-  ℹ Application starting up... running outbox crash recovery routine (resetSendingMessagesLocal)...
-  ✓ Crash recovery complete: 1 in-flight message restored to 'pending'.
-  ✓ All 10 messages restored durably from local storage across application restart.
-
-[STEP 3] Simulate Temporary Failure (503) & Lost Acknowledgement
-======================================================================
-  ℹ Network connectivity returned. Starting sequential FIFO synchronization...
-  ✓ Delivered: bench_msg_001 (Status: 201)
-  ✓ Delivered: bench_msg_002 (Status: 201)
-  ⚠ Temporary Failure (503): bench_msg_003 marked 'failed' (Attempt 1)
-  ✓ Delivered: bench_msg_004 (Status: 201)
-  ✓ Delivered: bench_msg_005 (Status: 201)
-  ✓ Delivered: bench_msg_006 (Status: 201)
-  ⚠ Lost Acknowledgement: bench_msg_007 saved on server, but client ack dropped!
-  ✓ Delivered: bench_msg_008 (Status: 201)
-  ✓ Delivered: bench_msg_009 (Status: 201)
-  ✓ Delivered: bench_msg_010 (Status: 201)
-
-[STEP 4] Reconnection & Idempotent Recovery Pass
-======================================================================
-  ℹ Retrying remaining failed/pending messages...
-  ℹ Found 2 message(s) requiring retry: bench_msg_003, bench_msg_007
-  ✓ Recovered: bench_msg_003 newly saved (201 Created)
-  ✓ Idempotent Recovery: bench_msg_007 reconciled existing server record (200 OK - No duplicate!)
-
-[STEP 5] Backend Verification: Exact Order & Idempotency
-======================================================================
-  Backend Message Count: 10 (Expected: 10)
-
-  Backend Message Ordering Check:
-  --------------------------------------------------------------------
-  Pos | Client Message ID | Created Timestamp    | Content
-  ----+-------------------+----------------------+--------------------
-   1  | bench_msg_001     | 16:39:31             | Safety Observation #1: P... ✓
-   2  | bench_msg_002     | 16:39:32             | Safety Observation #2: P... ✓
-   3  | bench_msg_003     | 16:39:33             | Safety Observation #3: P... ✓
-   4  | bench_msg_004     | 16:39:34             | Safety Observation #4: P... ✓
-   5  | bench_msg_005     | 16:39:35             | Safety Observation #5: P... ✓
-   6  | bench_msg_006     | 16:39:36             | Safety Observation #6: P... ✓
-   7  | bench_msg_007     | 16:39:37             | Safety Observation #7: P... ✓
-   8  | bench_msg_008     | 16:39:38             | Safety Observation #8: P... ✓
-   9  | bench_msg_009     | 16:39:39             | Safety Observation #9: P... ✓
-  10  | bench_msg_010     | 16:39:40             | Safety Observation #10: ... ✓
-  ✓ Every logical message exists exactly ONCE on the backend in documented FIFO order.
-  ✓ Local outbox fully reconciled: 10/10 messages marked as delivered.
-
+Total Messages Queued:            10
+Messages Persisted in Outbox:     10/10 (State: pending)
+Crash Recovery Validated:         Yes (in-flight 'sending' recovered to 'pending')
+Messages Synchronized:            10/10
+Simulated Temporary Error (503):  1 recovered (bench_msg_003)
+Simulated Lost Ack (AC5):         1 recovered idempotently (bench_msg_007)
+Duplicate Records Created:        0 (Unique constraint enforced)
+Backend Final Verification:       10/10 present in exact FIFO order
+Local Outbox Reconciled:          10/10 marked delivered
+Execution Status:                 PASS (Exit Code 0)
 ========================================================================
-  BENCHMARK COMPLETED SUCCESSFULLY (ALL ACCEPTANCE SCENARIOS PASSED)
-========================================================================
-  Total Messages Queued:         10
-  Crash Recovery Validated:      Yes (in-flight 'sending' restored)
-  Simulated Temporary Error (503): 1 recovered
-  Simulated Lost Ack (AC5):       1 recovered idempotently (0 duplicates)
-  Backend Verification:          10/10 present in exact FIFO order
-  Execution Status:              PASS (Code 0)
 ```
 
 ---
 
-## Architecture and data flow
+## Key architectural decisions
 
-The architecture decouples UI state, durable persistence, synchronization coordination, and server-side idempotency:
+### 1. State Machine & Local Outbox Pattern
+Messages transition through explicit states: `pending` -> `sending` -> `delivered` or `failed`. SQLite is the durable source of truth; React state merely reflects database contents.
 
-```
-+-------------------------------------------------------------------+
-|                     ConversationScreen.js                         |
-|  - Renders chat list from SQLite queries                          |
-|  - Delivery state badges: Pending, Sending, Failed, Delivered     |
-|  - Reviewer Simulation Drawer (Offline, 503 error, Lost Ack)      |
-+---------------------------------+---------------------------------+
-                                  |
-            1. User sends message | 2. Immediate local save
-                                  v
-+-------------------------------------------------------------------+
-|               messageRepository.js / database.js                  |
-|  - Durable SQLite outbox (table: messages)                        |
-|  - State persistence across lifecycle restarts                    |
-|  - Crash recovery handler: resetSendingMessagesLocal()            |
-+---------------------------------+---------------------------------+
-                                  |
-            3. Queries pending    | 4. Updates state (sending -> del)
-                                  v
-+-------------------------------------------------------------------+
-|                        SyncManager.js                             |
-|  - NetInfo network connectivity listener                          |
-|  - Mutex concurrency guard (isSyncing)                            |
-|  - Sequential FIFO queue processor (createdAt ASC, id ASC)        |
-|  - Bounded automatic retries (MAX_AUTO_RETRIES = 3)               |
-+---------------------------------+---------------------------------+
-                                  |
-            5. HTTP POST /api/messages (clientMessageId)
-                                  v
-+-------------------------------------------------------------------+
-|                    Backend (Express + MongoDB)                    |
-|  - Unique index on clientMessageId                                |
-|  - New message: HTTP 201 Created                                  |
-|  - Duplicate key (code 11000): HTTP 200 OK (idempotent recovery)  |
-+-------------------------------------------------------------------+
-```
+### 2. FIFO Ordering vs. Head-of-Line Blocking Trade-off
+To preserve conversational coherence, messages are sent strictly in order (`createdAt ASC, id ASC`). To prevent a single permanent error from blocking the queue, retries are bounded to 3 attempts. When exhausted, the error is isolated to that message bubble, enabling manual recovery.
 
-### Finite State Machine
-- `pending` -> `sending` (claimed by SyncManager when online)
-- `sending` -> `delivered` (HTTP 201 or idempotent HTTP 200 received)
-- `sending` -> `failed` (network error or HTTP 5xx; retryCount incremented)
-- `sending` -> `pending` (app crash recovery on startup)
-- `failed` -> `sending` (auto-retry on reconnect if retryCount < 3)
-- `failed` -> `pending` (manual retry button resets retryCount = 0)
+### 3. Idempotency via Client-Generated UUIDs
+Client generates `clientMessageId` at creation. The server uses a unique index `{ clientMessageId: 1 }` and catches code `11000` to return `200 OK`, making every retry completely idempotent.
+
+### 4. Crash Recovery Supervisor
+On app mount, `resetSendingMessagesLocal()` inspects SQLite for any messages stranded in `sending` state due to process termination and restores them to `pending`.
+
+### 5. Dynamic Queue Draining (Stretch Goal)
+Messages added while synchronization is actively underway are dynamically picked up by a `while (hasPending)` loop and synchronized in proper sequence.
 
 ---
 
-## Technology choices
+## Assumptions and Limitations
 
-1. **Frontend: React Native (0.80.0) + React 19**:
-   - *Why*: Enables rapid cross-platform native execution with direct access to SQLite native storage, background network listeners (`NetInfo`), and hardware lifecycle events.
-   - *Alternatives Considered*: Flutter, pure native Kotlin/Swift. React Native was chosen to maintain shared JavaScript idioms across mobile client and Node backend.
-
-2. **Durable Local Storage: SQLite (`react-native-sqlite-storage`)**:
-   - *Why*: SQLite provides true ACID transactions, relational querying (`ORDER BY createdAt ASC, id ASC`), and durability across app termination and device restarts.
-   - *Alternatives Considered*: `AsyncStorage` (unsuitable: key-value only, prone to serialization bottlenecks and lacks atomic transactional ordering) and `MMKV` (fast, but lacks complex SQL queue querying).
-
-3. **Backend: Node.js / Express + MongoDB / Mongoose**:
-   - *Why*: Minimal, transparent backend suitable for deterministic inspection. MongoDB unique indexes allow natural enforcement of idempotency via code `11000` duplicate key detection.
-
----
-
-## Important decisions
-
-1. **Durable Outbox Ownership in SQLite (Not React State)**:
-   - *Decision*: The screen state does not own the outbox. Messages are written to SQLite *before* any network attempt is initiated.
-   - *Rationale*: If the app crashes 5ms after user taps Send, the message is durably preserved in SQLite and recovered on next startup.
-
-2. **Strict FIFO Ordering with Head-of-Line Blocking Trade-off**:
-   - *Decision*: Messages are transmitted strictly in `createdAt ASC, id ASC` order, one at a time.
-   - *Trade-off*: Preserves causality in safety-critical communications (e.g. "Shutdown" never arrives after "Start"). The accepted trade-off is temporary Head-of-Line blocking if message #1 fails, mitigated by bounding automatic retries to 3 attempts before pausing.
-
-3. **Client-Generated UUIDs for Idempotent Deduplication**:
-   - *Decision*: Every message generates a UUID `clientMessageId` at creation.
-   - *Rationale*: Solves the classic two-generals / uncertain acknowledgement problem: when the client's network drops after the server commits the write, the client retries with the same ID. The backend recognizes the key, avoids duplicates, and returns HTTP 200.
-
----
-
-## Assumptions and limitations
-
-1. **Scope Boundaries**:
-   - Authentication, multimedia attachments, voice messages, and push notifications were excluded per the prompt's out-of-scope boundaries.
-2. **Foreground & Active Background Execution**:
-   - Synchronization is coordinated while the app process is active in foreground or background. OS-level termination background workers (Android WorkManager / iOS BGAppRefreshTask) were omitted to adhere to the 6-8 hour prototype complexity limit.
-3. **Single Active Conversation**:
-   - The queue operates on a per-conversation FIFO basis (`factory-safety-room-1`).
+* Authentication and authorization are outside the scope of the challenge.
+* User profiles are outside the current scope.
+* Incoming real-time messages are outside the current implementation.
+* Attachments such as images, audio, and video are not supported.
+* The backend is intended as a challenge prototype rather than a production deployment.
+* The current development configuration uses a local backend address.
+* Background synchronization while the application is completely terminated is not implemented.
+* Production deployment would require HTTPS.
+* Production deployment would require additional security controls.
+* Production monitoring and observability are not implemented as a full production system.
+* The current implementation focuses on outgoing offline messages and their synchronization lifecycle.
 
 ---
 
 ## Production and scale
 
-If advancing to production at significant scale, the following improvements would be prioritized:
+The submitted implementation focuses on the core challenge requirements:
+* Offline persistence
+* Durable local outbox
+* Connectivity-aware synchronization
+* Failure handling
+* Retry/recovery
+* Ordering
+* Idempotent message ingestion
 
-1. **OS Background Synchronization**:
-   - Integrate Android `WorkManager` and iOS `BGAppRefreshTask` to schedule background sync jobs constrained to network connectivity even when the user force-quits the app.
-2. **Partitioned FIFO Queues**:
-   - Partition message outboxes by `conversationId` so that a failing message in Room A never delays messages in Room B.
-3. **Exponential Backoff with Jitter**:
-   - Replace constant retries with exponential backoff and randomized jitter (`delay = base * 2^attempt + random_jitter`) to protect backend infrastructure from thundering-herd reconnects.
-4. **Outbox Compaction**:
-   - Implement scheduled pruning of messages marked `delivered` older than 30 days to bound local database size.
+For production or significantly greater scale, I would consider the following improvements.
+
+### Security
+* HTTPS
+* Authentication & Authorization
+* Secure credential handling
+* Input validation & Rate limiting
+
+### Synchronization
+* Background synchronization via Android WorkManager
+* Exponential backoff with jitter
+* Stronger acknowledgement handling
+* Conflict resolution for bidirectional synchronization
+
+### Backend Scalability
+* Database indexing & Pagination
+* Connection pooling & Horizontal scaling
+* Queue-based processing where appropriate
+* Production database monitoring
+
+### Observability
+* Structured logging & Metrics
+* Distributed tracing & Error tracking
+* Synchronization monitoring & Alerting
+
+### Testing & Delivery
+* Integration & End-to-end tests
+* Failure-injection tests
+* Device-level testing & CI/CD automation
 
 ---
 
 ## AI usage
 
-- **AI Tools Used**: Google Antigravity IDE (Advanced Agentic Pair Programming Assistant).
-- **Contribution**:
-  - Investigated React Native 0.80.0 Jest mock resolution issue.
-  - Implemented the 5 required unit test suites covering the exact acceptance criteria.
-  - Authored the repeatable `scripts/verificationBenchmark.js` verification benchmark script.
-  - Constructed the Reviewer Simulation Panel and endpoint fallback logic.
-- **Review and Validation**:
-  - All generated code was thoroughly reviewed, verified with automated Jest runs (both Frontend and Backend), and validated end-to-end against live MongoDB via ADB USB reverse tunnel and terminal queries.
+AI tools were used during development for:
+* Understanding challenge requirements
+* Discussing architecture and implementation approaches
+* Debugging development issues
+* Reviewing implementation details
+* Assisting with code and documentation
+
+AI-generated suggestions were reviewed and adapted during implementation. Application behavior was manually tested during development.
 
 ---
 
 ## Credibility note
 
-- **Product / System Previously Shipped**: High-volume distributed event ingestion and offline field-reporting engine for mobile operations.
-- **Problem Solved**: Field technicians operating in remote industrial environments with intermittent satellite/cellular connectivity frequently suffered lost inspection records and out-of-order equipment telemetry.
-- **Personal Contribution**: Designed and implemented the client-side SQLite durable outbox, deterministic FIFO queue synchronization engine, and server-side idempotent ingestion APIs handling ~1.2M daily status events.
-- **Scale / Complexity**: 15,000 active field devices; zero-data-loss requirement under battery drops and network timeouts.
-- **Difficult Engineering Decision**: Choosing strict causal ordering versus optimistic parallel uploads. Selected per-asset partitioned FIFO queues, allowing independent pieces of machinery to upload in parallel while ensuring telemetry for any individual asset remained strictly chronological.
+### Previous project
+
+**Project:** BiteBox — Customer, Vendor & Delivery Partner Applications
+
+- **Problem solved:**  
+  BiteBox is a grocery ordering and delivery platform that connects customers, grocery vendors, and delivery partners. The platform supports the complete grocery order lifecycle, from customers placing orders, to vendors processing orders, to delivery partners handling and completing deliveries.
+
+- **Personal contribution:**  
+  I worked on the mobile application development across the Customer, Vendor, and Delivery Partner applications. My work included developing and maintaining React Native screens, integrating backend APIs, handling application state, implementing order-related workflows, managing API responses and errors, and debugging issues across the applications.
+
+- **Scale / operational complexity:**  
+  The platform involved three different user roles with different workflows:
+  - **Customer:** Browse grocery products, manage the cart, place orders, and track order status.
+  - **Vendor:** Manage grocery products, receive and process customer orders, and update order status.
+  - **Delivery Partner:** View assigned deliveries, manage delivery status, and complete the delivery workflow.
+  
+  The main engineering complexity involved coordinating the different user applications with backend APIs and keeping order information consistent across the Customer, Vendor, and Delivery Partner workflows.
+
+- **Difficult engineering/product decision:**  
+  One important engineering challenge was handling different order states across the Customer, Vendor, and Delivery Partner applications. I worked with asynchronous API responses and application state so that each user role could see the appropriate information and perform the correct actions based on the current order status. I also handled loading and error states for API operations.
+
+- **Public link/evidence:**  
+  The BiteBox project is not publicly available on GitHub, so the source code cannot be provided as public evidence. The project experience can be discussed during the technical discussion if required.
+
+---
+
+## Demo
+
+The final demo should demonstrate the complete offline-to-online lifecycle:
+
+1. Open the SafeTrack Factory Safety conversation.
+2. Send a message while online.
+3. Disable network connectivity.
+4. Send a message while offline.
+5. Show that the message appears immediately.
+6. Show the pending delivery state.
+7. Force-close the application.
+8. Reopen the application.
+9. Show that the message remains available.
+10. Restore network connectivity.
+11. Show synchronization.
+12. Show the message becoming delivered.
+13. Demonstrate a temporary synchronization failure.
+14. Show the failed state.
+15. Retry the message.
+16. Show successful synchronization.
+17. Demonstrate duplicate prevention using the same `clientMessageId`.
