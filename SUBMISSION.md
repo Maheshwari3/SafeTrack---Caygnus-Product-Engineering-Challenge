@@ -523,24 +523,25 @@ Application behavior was manually tested during development.
 **Project:** BiteBox — Customer, Vendor & Delivery Partner Applications
 
 - **Problem solved:**  
-  BiteBox is a food ordering and delivery platform connecting customers, food vendors, and delivery partners. The platform supports the complete order lifecycle, from customers placing orders, to vendors managing and preparing orders, to delivery partners handling delivery and order completion.
+  BiteBox is a grocery ordering and delivery platform that connects customers, grocery vendors, and delivery partners. The platform supports the complete grocery order lifecycle, from customers placing orders, to vendors processing orders, to delivery partners handling and completing deliveries.
 
 - **Personal contribution:**  
-  I worked on the mobile application development across the Customer, Vendor, and Delivery Partner applications. My work included building and maintaining React Native screens, integrating backend APIs, handling application state, implementing order-related workflows, managing API responses and errors, and debugging issues across the applications.
+  I worked on the mobile application development across the Customer, Vendor, and Delivery Partner applications. My work included developing and maintaining React Native screens, integrating backend APIs, handling application state, implementing order-related workflows, managing API responses and errors, and debugging issues across the applications.
 
 - **Scale / operational complexity:**  
-  The platform involved three different user roles with different workflows and responsibilities:
-  - **Customer:** Browse food, place orders, track order status, and manage order-related actions.
-  - **Vendor:** Receive and manage orders, update order status, and handle vendor-side operations.
+  The platform involved three different user roles with different workflows:
+  - **Customer:** Browse grocery products, manage the cart, place orders, and track order status.
+  - **Vendor:** Manage grocery products, receive and process customer orders, and update order status.
   - **Delivery Partner:** View assigned deliveries, manage delivery status, and complete the delivery workflow.
   
-  The main engineering complexity was keeping the different applications synchronized with backend order states and handling asynchronous API communication across the different stages of an order.
+  The main engineering complexity involved coordinating the different user applications with backend APIs and keeping order information consistent across the Customer, Vendor, and Delivery Partner workflows.
 
 - **Difficult engineering/product decision:**  
-  One of the important engineering challenges was managing different order states across the Customer, Vendor, and Delivery Partner applications. I worked with asynchronous API responses and application state so that each user role could see and perform the actions appropriate to the current order status. Error handling and loading states were also handled to make the application behavior more reliable when API requests failed or took time to complete.
+  One important engineering challenge was handling different order states across the Customer, Vendor, and Delivery Partner applications. I worked with asynchronous API responses and application state so that each user role could see the appropriate information and perform the correct actions based on the current order status. I also handled loading and error states for API operations.
 
 - **Public link/evidence:**  
-  The BiteBox project is not publicly available on GitHub, so the source code cannot be provided as public evidence. The project experience can be discussed and demonstrated during the technical discussion if required.
+  The BiteBox project is not publicly available on GitHub, so the source code cannot be provided as public evidence. The project experience can be discussed during the technical discussion if required.
+
 ---
 
 ## Demo
