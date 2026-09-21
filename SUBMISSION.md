@@ -520,23 +520,27 @@ Application behavior was manually tested during development.
 
 ### Previous project
 
-**Project:** FoodApp Vendor
+**Project:** BiteBox — Customer, Vendor & Delivery Partner Applications
 
 - **Problem solved:**  
-  A mobile application for food vendors to manage customer orders and related vendor operations.
+  BiteBox is a food ordering and delivery platform connecting customers, food vendors, and delivery partners. The platform supports the complete order lifecycle, from customers placing orders, to vendors managing and preparing orders, to delivery partners handling delivery and order completion.
 
 - **Personal contribution:**  
-  I worked on the React Native application, including UI development, API integration, order-related functionality, and debugging application issues.
+  I worked on the mobile application development across the Customer, Vendor, and Delivery Partner applications. My work included building and maintaining React Native screens, integrating backend APIs, handling application state, implementing order-related workflows, managing API responses and errors, and debugging issues across the applications.
 
 - **Scale / operational complexity:**  
-  The application involved communication between the mobile application and backend APIs for vendor and order-related operations. I worked with asynchronous API responses and different application states such as loading, success, and error states.
+  The platform involved three different user roles with different workflows and responsibilities:
+  - **Customer:** Browse food, place orders, track order status, and manage order-related actions.
+  - **Vendor:** Receive and manage orders, update order status, and handle vendor-side operations.
+  - **Delivery Partner:** View assigned deliveries, manage delivery status, and complete the delivery workflow.
+  
+  The main engineering complexity was keeping the different applications synchronized with backend order states and handling asynchronous API communication across the different stages of an order.
 
 - **Difficult engineering/product decision:**  
-  One of the challenges was keeping the mobile application's UI state consistent with asynchronous backend API responses. I handled API communication and UI state updates separately so that loading, success, and error states could be managed more reliably.
+  One of the important engineering challenges was managing different order states across the Customer, Vendor, and Delivery Partner applications. I worked with asynchronous API responses and application state so that each user role could see and perform the actions appropriate to the current order status. Error handling and loading states were also handled to make the application behavior more reliable when API requests failed or took time to complete.
 
 - **Public link/evidence:**  
-  The project is not publicly available on GitHub, so source code cannot be provided as public evidence.
-
+  The BiteBox project is not publicly available on GitHub, so the source code cannot be provided as public evidence. The project experience can be discussed and demonstrated during the technical discussion if required.
 ---
 
 ## Demo
