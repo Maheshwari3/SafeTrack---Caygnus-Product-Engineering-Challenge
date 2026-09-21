@@ -520,13 +520,13 @@ Application behavior was manually tested during development.
 
 ### Previous project
 
-**Project:** `<Add your actual project name>`
+**Project:** `SafeTrack`
 
-* **Problem solved:** `<Describe the real problem the project solved>`
+* **Problem solved:** `Factory workers need to report safety incidents/messages even with unreliable shop-floor connectivity, without losing reports or creating duplicates`
 * **Personal contribution:** `<Describe what you personally designed, implemented, or owned>`
 * **Scale / operational complexity:** `<Add truthful information about users, transactions, APIs, deployment, or other relevant complexity>`
 * **Difficult engineering/product decision:** `<Describe one real decision, the alternatives considered, and why you chose the final approach>`
-* **Public link/evidence:** `<Add GitHub, demo, website, or other evidence if available>`
+* **Public link/evidence:** `[<Add GitHub, demo, website, or other evidence if available>](https://github.com/Maheshwari3/SafeTrack---Caygnus-Product-Engineering-Challenge)`
 
 Confidential project information can be anonymized and numerical figures can be approximate where appropriate.
 
