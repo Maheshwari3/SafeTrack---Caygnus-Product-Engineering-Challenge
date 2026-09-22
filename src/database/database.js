@@ -18,25 +18,7 @@ export const getDBConnection = async () => {
 };
 
 export const createTables = async (db) => {
-  // Existing incidents table
-  const incidentsQuery = `
-    CREATE TABLE IF NOT EXISTS incidents (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      clientIncidentId TEXT UNIQUE NOT NULL,
-      title TEXT NOT NULL,
-      location TEXT NOT NULL,
-      severity TEXT NOT NULL,
-      description TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      syncStatus TEXT NOT NULL,
-      retryCount INTEGER DEFAULT 0,
-      lastError TEXT
-    );
-  `;
-
-  await db.executeSql(incidentsQuery);
-
-  // Problem 2 message outbox
+  // Offline message outbox (Problem 2)
   const messagesQuery = `
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

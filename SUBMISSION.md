@@ -111,7 +111,6 @@ npm test
 ```
 **Observed Result:**
 ```text
-PASS tests/incident.test.js
 PASS tests/message.test.js
   Message API - Idempotency and Validation
     √ should save a new message and return 201
@@ -123,8 +122,8 @@ PASS tests/message.test.js
     √ should simulate lost acknowledgement: message saved but error returned, then idempotent retry succeeds with 200
     √ should reset messages when requested
 
-Test Suites: 2 passed, 2 total
-Tests:       10 passed, 10 total
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
 Snapshots:   0 total
 Time:        1.85 s
 ```

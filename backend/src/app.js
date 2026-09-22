@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const incidentRoutes = require('./routes/incidentRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 
 const app = express();
@@ -10,7 +9,6 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use('/api/incidents', incidentRoutes);
 app.use('/api/messages', messageRoutes);
 
 // Base route

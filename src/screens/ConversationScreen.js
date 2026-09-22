@@ -277,12 +277,14 @@ export default function ConversationScreen({ navigation }) {
             >
                 {/* Screen Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => navigation.goBack()}
-                    >
-                        <ArrowLeftIcon size={20} color={COLORS.text} />
-                    </TouchableOpacity>
+                    {navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack() && (
+                        <TouchableOpacity
+                            style={styles.backButton}
+                            onPress={() => navigation.goBack()}
+                        >
+                            <ArrowLeftIcon size={20} color={COLORS.text} />
+                        </TouchableOpacity>
+                    )}
 
                     <View style={{ flex: 1 }}>
                         <Text style={TYPOGRAPHY.h2}>Safety Conversation</Text>

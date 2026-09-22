@@ -21,6 +21,5 @@ const DEV_API_URL = 'http://localhost:5000';
 const PROD_API_URL = 'http://10.102.115.9:5000';
 
 export const API_BASE_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;
-export const INCIDENTS_API_URL = `${API_BASE_URL}/api/incidents`;
 export const MESSAGES_API_URL = `${API_BASE_URL}/api/messages`;
 

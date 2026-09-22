@@ -25,9 +25,12 @@ jest.mock('../src/database/database', () => ({
   createTables: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../src/database/incidentRepository', () => ({
-  getIncidentsLocal: jest.fn().mockResolvedValue([]),
-  getQueueSummaryLocal: jest.fn().mockResolvedValue({ pending: 0, syncing: 0, failed: 0, synced: 0 }),
+jest.mock('../src/database/messageRepository', () => ({
+  saveMessageLocal: jest.fn().mockResolvedValue({}),
+  getMessagesLocal: jest.fn().mockResolvedValue([]),
+  getMessageQueueSummaryLocal: jest.fn().mockResolvedValue({ pending: 0, sending: 0, failed: 0, delivered: 0 }),
+  clearAllMessagesLocal: jest.fn().mockResolvedValue(undefined),
+  resetSendingMessagesLocal: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../src/sync/SyncManager', () => ({

@@ -261,33 +261,27 @@ SafeTrack/
 ├── src/
 │   ├── database/
 │   │   ├── database.js
-│   │   ├── incidentRepository.js
 │   │   └── messageRepository.js
 │   ├── screens/
-│   │   ├── ConversationScreen.js
-│   │   ├── DashboardScreen.js
-│   │   ├── CreateIncidentScreen.js
-│   │   ├── IncidentDetailsScreen.js
-│   │   └── HistoryScreen.js
+│   │   └── ConversationScreen.js
 │   ├── sync/
 │   │   └── SyncManager.js
 │   ├── config.js
 │   └── theme.js
 │
+├── apk/
+│   └── SafeTrack.apk
+│
 ├── backend/
 │   ├── src/
 │   │   ├── controllers/
-│   │   │   ├── incidentController.js
 │   │   │   └── messageController.js
 │   │   ├── models/
-│   │   │   ├── Incident.js
 │   │   │   └── Message.js
 │   │   ├── routes/
-│   │   │   ├── incidentRoutes.js
 │   │   │   └── messageRoutes.js
 │   │   └── app.js
 │   ├── tests/
-│   │   ├── incident.test.js
 │   │   └── message.test.js
 │   ├── server.js
 │   ├── package.json
@@ -599,7 +593,6 @@ npm test
 
 **Observed Result:**
 ```text
-PASS tests/incident.test.js
 PASS tests/message.test.js
   Message API - Idempotency and Validation
     √ should save a new message and return 201
@@ -611,8 +604,8 @@ PASS tests/message.test.js
     √ should simulate lost acknowledgement: message saved but error returned, then idempotent retry succeeds with 200
     √ should reset messages when requested
 
-Test Suites: 2 passed, 2 total
-Tests:       10 passed, 10 total
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
 Snapshots:   0 total
 Time:        1.85 s
 ```
