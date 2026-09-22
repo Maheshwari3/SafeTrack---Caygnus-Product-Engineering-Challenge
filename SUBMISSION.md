@@ -40,7 +40,11 @@ npm run dev
 The server listens at `http://localhost:5000`.
 
 ### 2. Configure Network & Launch Mobile Application
-From the repository root:
+
+The mobile app supports both **Debug Development builds** and **Standalone Release APK builds** via automatic environment switching (`__DEV__`) in `src/config.js`.
+
+#### Option A: Debug Development Build (via Metro & USB)
+From the `Frontend/SafeTrack` directory:
 ```powershell
 # Port forward so Android communicates directly over USB (bypassing firewall blocks):
 adb reverse tcp:5000 tcp:5000
@@ -54,6 +58,14 @@ npm start
 # In a second terminal, build and install onto Android:
 npx react-native run-android
 ```
+
+#### Option B: Standalone Release APK Build
+In a release APK, `__DEV__` is false, and the app connects to `PROD_API_URL` in `src/config.js` (e.g., local Wi-Fi IP `http://10.102.115.9:5000`, HTTPS tunnel via `npx localtunnel --port 5000`, or deployed cloud backend):
+```powershell
+cd android
+./gradlew assembleRelease
+```
+The APK is generated at `android/app/build/outputs/apk/release/app-release.apk` for standalone installation on any Android device.
 
 ### Reviewer Testing & Failure Scenarios
 The application includes an in-app **Reviewer Simulation Drawer** accessible by tapping the top-right sliders icon on the Conversation Screen:
@@ -179,8 +191,8 @@ Messages added while synchronization is actively underway are dynamically picked
 * User profiles are outside the current scope.
 * Incoming real-time messages are outside the current implementation.
 * Attachments such as images, audio, and video are not supported.
-* The backend is intended as a challenge prototype rather than a production deployment.
-* The current development configuration uses a local backend address.
+* The backend is intended as a challenge prototype running locally or via public tunnel/cloud host.
+* Network endpoints use environment-aware routing (`__DEV__` in `src/config.js`): Debug builds use `localhost:5000` via `adb reverse`, while Release APKs use `PROD_API_URL` (configurable for local Wi-Fi IP, HTTPS tunnel, or deployed cloud backend).
 * Background synchronization while the application is completely terminated is not implemented.
 * Production deployment would require HTTPS.
 * Production deployment would require additional security controls.

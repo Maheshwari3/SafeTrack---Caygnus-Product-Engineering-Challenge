@@ -99,6 +99,15 @@ Messages within a conversation are queued and synchronized in **Strict FIFO (Fir
   2. The worker checks for any messages in `pending` state or in `failed` state with `retryCount < MAX_AUTO_RETRIES`.
   3. Messages are dispatched sequentially.
 
+- **Environment-Aware Endpoint Resolution (`__DEV__`)**:
+  Mobile applications behave differently across development and release environments:
+  * **Debug Builds (`__DEV__ === true`)**: Communicates with `http://localhost:5000` mapped over USB loopback using `adb reverse tcp:5000 tcp:5000`.
+  * **Release APK Builds (`__DEV__ === false`)**: Physical devices running standalone APKs cannot use `localhost` because `localhost` maps to the phone's internal loopback (`127.0.0.1`), where no backend runs. `src/config.js` automatically selects `PROD_API_URL`, supporting:
+    - **Local Wi-Fi Testing**: PC's local IP address (e.g. `http://10.102.115.9:5000`) over the same Wi-Fi.
+    - **HTTPS Tunneling**: Free live tunnels via `npx localtunnel --port 5000` or `ngrok http 5000` (allowing real phone testing anywhere on Wi-Fi or mobile data).
+    - **Cloud Deployment**: Production endpoints hosted on Render, Railway, or AWS.
+  * **Cleartext Permitted**: Android Manifest includes `android:usesCleartextTraffic="true"` to ensure HTTP communication succeeds during local LAN testing.
+
 ---
 
 ## 5. Failure Classification & Retry Boundaries

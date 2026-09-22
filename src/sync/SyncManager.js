@@ -191,20 +191,24 @@ class SyncManager {
             try {
               response = await fetch(this.apiUrl, requestOptions);
             } catch (initialError) {
-              const fallback = this.apiUrl.includes('localhost')
-                ? 'http://10.102.115.9:5000/api/messages'
-                : 'http://localhost:5000/api/messages';
+              if (__DEV__ && (this.apiUrl.includes('localhost') || this.apiUrl.includes('10.102.115.9'))) {
+                const fallback = this.apiUrl.includes('localhost')
+                  ? 'http://10.102.115.9:5000/api/messages'
+                  : 'http://localhost:5000/api/messages';
 
-              try {
-                const altRes = await fetch(fallback, requestOptions);
-                if (altRes && typeof altRes.status === 'number') {
-                  response = altRes;
-                  this.apiUrl = fallback;
-                  console.log(`Switched active messages API endpoint to: ${fallback}`);
-                } else {
+                try {
+                  const altRes = await fetch(fallback, requestOptions);
+                  if (altRes && typeof altRes.status === 'number') {
+                    response = altRes;
+                    this.apiUrl = fallback;
+                    console.log(`Switched active messages API endpoint to: ${fallback}`);
+                  } else {
+                    throw initialError;
+                  }
+                } catch {
                   throw initialError;
                 }
-              } catch {
+              } else {
                 throw initialError;
               }
             }
