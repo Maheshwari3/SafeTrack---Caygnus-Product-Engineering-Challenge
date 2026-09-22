@@ -24,8 +24,12 @@ export default function DashboardScreen({ navigation }) {
           let response;
           try {
             response = await fetch(INCIDENTS_API_URL);
-          } catch {
-            response = await fetch('http://localhost:5000/api/incidents');
+          } catch (fetchErr) {
+            if (__DEV__ && !INCIDENTS_API_URL.includes('localhost')) {
+              response = await fetch('http://localhost:5000/api/incidents');
+            } else {
+              throw fetchErr;
+            }
           }
           if (response && response.ok) {
             const apiData = await response.json();

@@ -349,27 +349,73 @@ http://localhost:5000
 
 ---
 
-# Mobile Setup
+# Mobile Setup (Debug Build & Release APK)
 
-### Step 1: Port Forwarding (USB Debugging / Emulator)
-Run port forwarding so Android connects directly to the backend over USB, bypassing local Wi-Fi router firewall blocks:
+The mobile application supports both **Debug Development builds** and **Standalone Release APK builds** through automatic environment switching (`__DEV__`) in `src/config.js`.
+
+---
+
+### Option A: Debug Build (Development via Metro & USB)
+
+In debug mode, `src/config.js` uses `DEV_API_URL = 'http://localhost:5000'`.
+
+1. **Port Forwarding (USB Debugging / Emulator):**
+   Run port forwarding so Android routes requests directly to your PC's backend over USB:
+   ```powershell
+   adb reverse tcp:5000 tcp:5000
+   ```
+
+2. **Install & Launch in Debug Mode:**
+   ```powershell
+   npm install
+
+   # Start Metro Bundler:
+   npm start
+
+   # In a separate terminal, install and launch on Android:
+   npx react-native run-android
+   ```
+
+---
+
+### Option B: Standalone Release APK Build
+
+In a standalone Release APK (or when the phone is not tethered via USB with `adb reverse`), `localhost` points to the phone itself rather than your PC.
+
+React Native automatically sets `__DEV__ = false` in release builds, switching to `PROD_API_URL` in `src/config.js`.
+
+#### 1. Choose your Release Endpoint in `src/config.js`:
+* **Method 1 (Local Wi-Fi Testing):** Use your PC's Wi-Fi IP address (both phone and PC on the same Wi-Fi):
+  ```javascript
+  const PROD_API_URL = 'http://10.102.115.9:5000'; // Replace with your PC IP from ipconfig
+  ```
+  *(Note: Allow port 5000 TCP inbound in Windows Defender Firewall).*
+* **Method 2 (Instant HTTPS Tunnel - Works anywhere on Wi-Fi or Mobile Data):**
+  Run in your backend terminal:
+  ```powershell
+  npx localtunnel --port 5000
+  ```
+  Paste the generated URL:
+  ```javascript
+  const PROD_API_URL = 'https://cool-panda-42.loca.lt';
+  ```
+* **Method 3 (Deployed Cloud Server):**
+  Deploy backend to Render, Railway, or AWS:
+  ```javascript
+  const PROD_API_URL = 'https://safetrack-api.onrender.com';
+  ```
+
+#### 2. Build the Release APK:
 ```powershell
-adb reverse tcp:5000 tcp:5000
+cd android
+./gradlew assembleRelease
 ```
 
-### Step 2: Install and Launch App
-From the project root:
-```powershell
-npm install
-
-# Start Metro Bundler:
-npm start
-
-# In a separate terminal, install and launch on Android:
-npx react-native run-android
+The generated APK is located at:
+```text
+android/app/build/outputs/apk/release/app-release.apk
 ```
-
-> **Note for Physical Devices:** If running wirelessly without ADB reverse, configure `src/config.js` with your development computer's local IP address: `http://<YOUR-PC-IP>:5000`.
+Transfer and install `app-release.apk` onto any Android device.
 
 ---
 
@@ -678,7 +724,7 @@ The current implementation focuses on the challenge requirements:
 * **Authentication & Profiles**: Outside the scope of the challenge.
 * **Attachments**: Images, audio, and video are not supported; text only.
 * **Incoming Real-time**: Focus is on outgoing offline messages and their synchronization lifecycle.
-* **Prototype Backend**: Intended as a challenge prototype running locally.
+* **Prototype Backend & Environment Routing**: Development builds use `localhost:5000` via `adb reverse tcp:5000 tcp:5000`. Release APK builds switch via `__DEV__` in `src/config.js` to `PROD_API_URL` (local Wi-Fi IP, HTTPS tunnel, or cloud server) for standalone device operation.
 * **Background Sync**: Background synchronization while the application is completely terminated is not implemented.
 * **Production Deployment**: Requires HTTPS, JWT authentication, and security monitoring.
 
