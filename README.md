@@ -411,6 +411,11 @@ android/app/build/outputs/apk/release/app-release.apk
 ```
 Transfer and install `app-release.apk` onto any Android device.
 
+Direct Download Link: You can download the APK with this direct link:
+
+```link
+https://github.com/Maheshwari3/SafeTrack---Caygnus-Product-Engineering-Challenge/raw/feature/problem-2-conversation/apk/SafeTrack.apk
+```
 ---
 
 # API Specification

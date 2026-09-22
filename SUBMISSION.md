@@ -67,6 +67,12 @@ cd android
 ```
 The APK is generated at `android/app/build/outputs/apk/release/app-release.apk` for standalone installation on any Android device.
 
+Direct Download Link: You can download the APK with this direct link:
+
+```link
+https://github.com/Maheshwari3/SafeTrack---Caygnus-Product-Engineering-Challenge/raw/feature/problem-2-conversation/apk/SafeTrack.apk
+```
+
 ### Reviewer Testing & Failure Scenarios
 The application includes an in-app **Reviewer Simulation Drawer** accessible by tapping the top-right sliders icon on the Conversation Screen:
 - **Trigger Successful Scenario**: With switches set to Normal, type a safety message and tap Send. The message appears instantly with an amber `🕒 Pending` badge, transitions to `🚀 Sending`, and resolves to green `✓ Delivered` upon server confirmation.
